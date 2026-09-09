@@ -1,15 +1,23 @@
 # will-it-run-local
 
-**Will this model run on my machine, how fast, and what should I stop tuning?**
+**You have a CPU and one consumer GPU. The model you want needs ten times your
+VRAM, and you are not spending five figures on an RTX 6000 Pro to run it.**
+
+**You probably don't have to.** The reference machine here runs a **156 GB**
+model on a **24 GB** RTX 3090 at **~10 tokens/sec**, by keeping the parts that
+are rarely read in system RAM. `wirl` works out the fastest way to do that on
+*your* hardware — and, just as usefully, tells you when to stop trying.
+
+That headline works because the model is a *mixture of experts*: only 2.3% of
+its weights are read per token, so most of it can sit in cheap RAM. A dense
+model of that size would crawl. `wirl` handles both, and says plainly which one
+you are holding — including when the honest answer is "not on this hardware".
 
 Ollama and LM Studio answer *"will it fit"*. This answers *"what is the fastest
-configuration that fits, and is it worth tuning at all"* — which is a different
-question, and one nobody automates.
-
-It works from first principles: read the GGUF tensor table, measure what the
-machine actually delivers, and do the arithmetic. Then it verifies the answer by
-measurement, because a prediction that has not been checked is a guess with
-decimal places.
+configuration that fits"*, which is a different question and one nobody
+automates. It reads the GGUF tensor table, measures what your machine actually
+delivers, does the arithmetic — then verifies the answer by measurement, because
+a prediction nobody checked is a guess with decimal places.
 
 ```console
 $ wirl plan DeepSeek-V4-Flash-Q4-mxfp4.gguf --draft dspark-Q8_0.gguf --ctx 16384
