@@ -125,10 +125,12 @@ def gpu_info() -> list:
             except ValueError:
                 return None
         gpus.append({
+            # Byte counts are ints: they get shifted and formatted as integers
+            # all over the codebase, and nvidia-smi hands back decimal strings.
             "index": num(p[0], int), "name": p[1],
-            "vram_total": (num(p[2]) or 0) * 1024 * 1024,
-            "vram_used": (num(p[3]) or 0) * 1024 * 1024,
-            "vram_free": (num(p[4]) or 0) * 1024 * 1024,
+            "vram_total": int((num(p[2]) or 0) * 1024 * 1024),
+            "vram_used": int((num(p[3]) or 0) * 1024 * 1024),
+            "vram_free": int((num(p[4]) or 0) * 1024 * 1024),
             "compute_cap": p[5], "driver": p[6],
             "pcie_gen": num(p[7], int), "pcie_width": num(p[8], int),
             "mem_clock_mhz": num(p[9]), "power_limit_w": num(p[10]),

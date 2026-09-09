@@ -1,0 +1,162 @@
+
+1. Hardware
+-----------
+  AMD EPYC 7B12 64-Core Processor, 64 physical cores
+  NVIDIA GeForce RTX 3090, 24.0 GiB VRAM
+  measuring memory bandwidth (a few seconds)...
+    stream: 23.3 GB/s peak, 23.2 median (64 threads, 32 GiB)
+
+2. Pre-flight
+-------------
+  [WARN] swap: 2.05 GiB of swap in use.
+         Small, but re-check after loading the model.
+  [WARN] dimm-population: EDAC reports 256 GiB installed but the kernel sees 216 GiB -- a 40 GiB gap.
+         That gap is about the size of one or more DIMMs. If a memory channel is
+         unpopulated you lose bandwidth in proportion, and no software setting
+         recovers it. Confirm with `sudo dmidecode -t memory` and compare the
+         number of populated slots against your CPU's channel count.
+  nothing blocking.
+
+3. Search space
+---------------
+  The cost model is used here and nowhere else: to pick which configurations are
+  worth launching. Everything reported below this point is measured.
+
+  model is MoE, 43 layers, 11.19 GB read per token
+  predicted starting point: --n-cpu-moe 43 (bracketing 39..43 empirically)
+
+4. VRAM boundary (measured)
+---------------------------
+  Bisecting by actually launching the server. A predicted boundary is a guess
+  about allocator behaviour; the real one is wherever it stops starting.
+
+  bracketing the VRAM boundary between --n-cpu-moe 39 and 43
+    trying --n-cpu-moe 41 ... does not start
+    trying --n-cpu-moe 42 ... starts (23971 MiB)
+  smallest --n-cpu-moe that starts: 42
+
+5. Throughput (measured)
+------------------------
+  3 repetitions each, one configuration at a time, spread reported.
+
+  measuring --n-cpu-moe 42
+    ready in 16s
+    rep0: 9.83 tok/s
+    rep1: 9.87 tok/s
+    rep2: 9.96 tok/s
+  measuring --n-cpu-moe 43
+    ready in 16s
+    rep0: 9.95 tok/s
+    rep1: 9.67 tok/s
+    rep2: 10.09 tok/s
+
+6. Draft depth (measured)
+-------------------------
+  Shallow first, stopping as soon as depth stops paying -- on sparse MoE it
+  usually does not.
+
+  draft depth n_max=1
+    ready in 16s
+    rep0: 10.01 tok/s
+    rep1: 9.99 tok/s
+    rep2: 10.04 tok/s
+  draft depth n_max=2
+    ready in 16s
+    rep0: 10.23 tok/s
+    rep1: 10.30 tok/s
+    rep2: 10.77 tok/s
+  draft depth n_max=3
+    ready in 16s
+    rep0: 9.66 tok/s
+    rep1: 10.20 tok/s
+    rep2: 9.54 tok/s
+    slower than the previous depth; deeper will not help. Stopping.
+
+7. Thread count (measured)
+--------------------------
+  Usually a null result on a bandwidth-bound model. If it is flat, that is the
+  finding.
+
+  threads=24
+    ready in 16s
+    rep0: 9.98 tok/s
+    rep1: 9.89 tok/s
+    rep2: 10.15 tok/s
+  threads=32
+    ready in 16s
+    rep0: 9.74 tok/s
+    rep1: 10.32 tok/s
+    rep2: 10.20 tok/s
+  threads=48
+    ready in 16s
+    rep0: 9.91 tok/s
+    rep1: 10.06 tok/s
+    rep2: 9.71 tok/s
+  threads=64
+    ready in 16s
+    rep0: 9.71 tok/s
+    rep1: 9.84 tok/s
+    rep2: 10.20 tok/s
+
+Measured results
+----------------
+| config | tok/s | spread | peak VRAM | startup |
+|---|---|---|---|---|
+| ncmoe=42 t=32 nmax=1 | 9.89 | 1.3% | 23963 MiB | 16s |
+| ncmoe=43 t=32 nmax=1 | 9.90 | 4.2% | 20699 MiB | 16s |
+| ncmoe=43 t=32 nmax=1 | 10.01 | 0.5% | 20721 MiB | 16s |
+| ncmoe=43 t=32 nmax=2 | 10.43 | 5.2% | 20735 MiB | 16s |
+| ncmoe=43 t=32 nmax=3 | 9.80 | 6.8% | 20760 MiB | 16s |
+| ncmoe=43 t=24 nmax=1 | 10.01 | 2.6% | 20721 MiB | 16s |
+| ncmoe=43 t=32 nmax=1 | 10.08 | 5.7% | 20699 MiB | 16s |
+| ncmoe=43 t=48 nmax=1 | 9.90 | 3.5% | 20699 MiB | 16s |
+| ncmoe=43 t=64 nmax=1 | 9.92 | 5.0% | 20699 MiB | 16s |
+
+Recommended
+-----------
+  ncmoe=43 t=32 nmax=2  ->  10.43 tok/s (spread 5.2%), 20735 MiB peak VRAM
+  fastest measured
+
+
+Long-context behaviour (measured)
+---------------------------------
+  Everything above used an almost-empty context. These run against one
+  already-running server, so they cost seconds rather than another startup.
+
+    ready in 16s
+    history     23 tok: prefill    16.9 tok/s (  1.4s to first token), decode 10.15 tok/s
+    history   1887 tok: prefill    59.0 tok/s ( 32.0s to first token), decode 10.60 tok/s
+    history   7509 tok: prefill    62.7 tok/s (119.7s to first token), decode 10.83 tok/s
+
+| history | prefill | time to first token | decode |
+|---|---|---|---|
+| 23 tok | 17 tok/s | 1.4 s | 10.15 tok/s |
+| 1887 tok | 59 tok/s | 32.0 s | 10.60 tok/s |
+| 7509 tok | 63 tok/s | 119.7 s | 10.83 tok/s |
+
+Decode falls 0% between an empty context and 7509 tokens of history.
+
+Same config at --ctx-size 32768 (measured)
+------------------------------------------
+  A longer context costs VRAM for the KV cache, which can force more experts
+  back onto the CPU. This measures whether it does.
+
+    ready in 16s
+    rep0: 9.89 tok/s
+    rep1: 9.90 tok/s
+    rep2: 9.87 tok/s
+  9.89 tok/s (spread 0.3%), 20826 MiB peak VRAM  -> -5.2% vs ctx 16384
+  For reference the cost model predicted 5.17 tok/s at --n-cpu-moe 43; measured
+  is +102% against that. The measured number is the one to trust.
+
+  Bandwidth-bound: 96% of each token is spent reading experts from system RAM at
+  23 GB/s. Thread count and most other flags will not move this.
+
+  The only large wins available are: more VRAM (offload more layers), faster
+  RAM, or a smaller quantisation.
+
+  Measured 10.43 tok/s is 202% of the 5.17 tok/s roofline. There is essentially
+  nothing left to tune -- stop here.
+
+  wrote launch script: /tmp/claude-1000/-home-john/de642172-3551-49c1-a658-511215708a2f/scratchpad/run-llama.sh
+  wrote systemd unit:  /tmp/claude-1000/-home-john/de642172-3551-49c1-a658-511215708a2f/scratchpad/run-llama.sh.service

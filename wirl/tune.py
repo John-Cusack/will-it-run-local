@@ -101,6 +101,36 @@ def summarise(results) -> str:
     return "\n".join(rows)
 
 
+def repeatability(results) -> str:
+    """Report the spread of any configuration measured more than once.
+
+    A sweep often re-measures the same configuration in different phases. That
+    is an accidental control, and a valuable one: it gives the cross-launch
+    variance, which is the real uncertainty on every other comparison in the
+    table. Differences smaller than this are not results.
+    """
+    from collections import defaultdict
+    by_label = defaultdict(list)
+    for r in results:
+        if r.ok and r.samples:
+            by_label[r.config.label()].append(r.mean)
+    repeated = {k: v for k, v in by_label.items() if len(v) > 1}
+    if not repeated:
+        return ""
+    lines = []
+    worst = 0.0
+    for label, means in repeated.items():
+        spread = (max(means) - min(means)) / (sum(means) / len(means)) * 100
+        worst = max(worst, spread)
+        vals = ", ".join(f"{m:.2f}" for m in means)
+        lines.append(f"  {label} measured {len(means)}x: {vals} tok/s "
+                     f"({spread:.1f}% apart)")
+    lines.insert(0, "Same configuration, separate launches:")
+    lines.append(f"So treat differences below about {worst:.0f}% in the table "
+                 "above as noise, not findings.")
+    return "\n".join(lines)
+
+
 def flag_unstable(results, threshold=8.0) -> list:
     """Call out configurations whose repetitions disagree.
 

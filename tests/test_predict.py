@@ -121,3 +121,50 @@ def test_cpu_only_prices_attention_bytes_too(dsv4):
     no_gpu = predict.cpu_only_tps(dsv4, MEASURED_RAM_BW)
     all_experts_on_cpu, _, _ = predict.predict_tps(dsv4, 43, MEASURED_RAM_BW, GPU_BW)
     assert no_gpu < all_experts_on_cpu
+
+
+def test_beating_the_roofline_is_reported_as_a_bad_estimate(dsv4):
+    """Measured 10.43 tok/s against a 5.17 roofline on the reference machine.
+
+    The old logic said "nothing left to tune" for anything above 90% of the
+    roofline, so 202% printed a confident falsehood. Exceeding the roofline
+    means the estimate is wrong -- hot experts stay in cache and are not
+    re-read from DRAM every token.
+    """
+    best = predict.Prediction(43, 0, 0, 0, True, 5.17, 96.0, 4.0)
+    lines = " ".join(predict.verdict(dsv4, best, 23e9, measured_tps=10.43))
+    assert "EXCEEDS" in lines
+    assert "estimate is wrong" in lines
+    assert "nothing left to tune" not in lines
+
+
+def test_no_bandwidth_bound_claim_when_measurement_contradicts_it(dsv4):
+    """Do not tell someone they are stuck at the memory wall while measuring
+    twice the throughput that wall allows."""
+    best = predict.Prediction(43, 0, 0, 0, True, 5.17, 96.0, 4.0)
+    lines = " ".join(predict.verdict(dsv4, best, 23e9, measured_tps=10.43))
+    assert "Bandwidth-bound" not in lines
+
+
+def test_at_the_wall_still_says_stop(dsv4):
+    best = predict.Prediction(43, 0, 0, 0, True, 9.61, 94.0, 8.0)
+    lines = " ".join(predict.verdict(dsv4, best, 45e9, measured_tps=9.89))
+    assert "nothing left to tune" in lines
+    assert "EXCEEDS" not in lines
+
+
+def test_gpu_bound_does_not_raise_a_false_alarm(dsv4):
+    """A dense model fully on the GPU measured 340 tok/s against a 1106 tok/s
+    roofline, and the tool announced "something is wrong". Nothing was: at
+    2.9 ms/token the cost is kernel launch and attention, not bandwidth.
+    """
+    best = predict.Prediction(28, 0, 0, 0, True, 1106.0, 1.0, 99.0)
+    lines = " ".join(predict.verdict(dsv4, best, 23e9, measured_tps=340.0))
+    assert "Something is wrong" not in lines
+    assert "GPU-bound" in lines
+
+
+def test_cpu_bound_underperformance_still_warns(dsv4):
+    best = predict.Prediction(43, 0, 0, 0, True, 10.0, 95.0, 5.0)
+    lines = " ".join(predict.verdict(dsv4, best, 45e9, measured_tps=4.0))
+    assert "Something is wrong" in lines

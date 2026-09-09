@@ -21,6 +21,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 BENCH_PROMPT = ("Write a detailed technical description of how a four-stroke "
@@ -64,9 +65,13 @@ class RunConfig:
         return a + self.extra
 
     def label(self) -> str:
-        bits = [f"ncmoe={self.n_cpu_moe}", f"t={self.threads or 'auto'}"]
+        bits = [f"ncmoe={self.n_cpu_moe}" if self.n_cpu_moe is not None
+                else f"ngl={self.n_gpu_layers}",
+                f"t={self.threads or 'auto'}"]
         if self.draft_model:
             bits.append(f"nmax={self.draft_n_max}")
+        if self.ctx != 16384:
+            bits.append(f"ctx={self.ctx}")
         return " ".join(bits)
 
 
@@ -133,9 +138,37 @@ def _wait_health(host, port, proc, timeout):
     return None
 
 
-def _generate(host, port, n_tokens, timeout=1800):
+# Filler used to build long prompts. Real prose rather than repeated tokens, so
+# the tokeniser behaves as it would on actual chat history.
+_FILLER = (
+    "The engine management system continuously samples intake air temperature, "
+    "manifold pressure, and crankshaft position, then adjusts injector pulse "
+    "width and spark advance to hold the mixture near stoichiometric. Under "
+    "transient load the controller leans on a feed-forward model because the "
+    "oxygen sensor lags the event it is meant to correct. "
+)
+
+
+def build_prompt(approx_tokens):
+    """A prompt of roughly `approx_tokens` tokens.
+
+    The exact count does not need to be hit: the server reports what it
+    actually processed, and that measured figure is what gets recorded.
+    """
+    if approx_tokens <= 0:
+        return BENCH_PROMPT
+    words = _FILLER.split()
+    # ~0.75 words per token for English prose.
+    need = max(1, int(approx_tokens * 0.75))
+    out = []
+    while len(out) < need:
+        out.extend(words)
+    return " ".join(out[:need]) + "\n\nSummarise the passage above in detail."
+
+
+def _generate(host, port, n_tokens, prompt=None, timeout=3600):
     body = json.dumps({
-        "messages": [{"role": "user", "content": BENCH_PROMPT}],
+        "messages": [{"role": "user", "content": prompt or BENCH_PROMPT}],
         "max_tokens": n_tokens, "temperature": 1.0, "top_p": 1.0,
         "stream": False, "cache_prompt": False,
     }).encode()
@@ -145,49 +178,69 @@ def _generate(host, port, n_tokens, timeout=1800):
     with urllib.request.urlopen(req, timeout=timeout) as r:
         d = json.load(r)
     t = d.get("timings", {})
-    return t.get("predicted_per_second"), t.get("prompt_per_second")
+    return (t.get("predicted_per_second"), t.get("prompt_per_second"),
+            t.get("prompt_n"))
 
 
-def run_config(cfg: RunConfig, binary: str, reps=3, n_tokens=400,
-               startup_timeout=1200, log_dir=None, verbose=True) -> RunResult:
-    """Start a server, measure it `reps` times, stop it. Always cleans up."""
+class ServerFailed(RuntimeError):
+    """The server never became healthy. Almost always VRAM."""
+
+
+@contextmanager
+def server(cfg: RunConfig, binary: str, startup_timeout=1200, log_dir=None,
+           verbose=True):
+    """Run a server for the duration of the block, then always tear it down.
+
+    Exposed separately from run_config because launches are expensive (20-140 s)
+    while requests are cheap. Anything that can be answered by asking a running
+    server -- prefill speed, decode with a long history -- should be, rather
+    than paying for another startup.
+    """
     argv = cfg.argv(binary)
     logf = None
     if log_dir:
         os.makedirs(log_dir, exist_ok=True)
         logf = open(os.path.join(
             log_dir, f"llama-{cfg.n_cpu_moe}-{cfg.threads}-{cfg.draft_n_max}-"
-                     f"{int(time.time())}.log"), "wb")
-
+                     f"{cfg.ctx}-{int(time.time())}.log"), "wb")
     proc = subprocess.Popen(argv, stdout=logf or subprocess.DEVNULL,
                             stderr=subprocess.STDOUT, start_new_session=True)
-    samples, prefill, peak, err = [], [], 0, None
     try:
         started = _wait_health(cfg.host, cfg.port, proc, startup_timeout)
         if started is None:
             rc = proc.poll()
-            return RunResult(cfg, [], [], 0, 0.0, False,
-                             f"server did not become healthy (exit={rc}); "
-                             f"see log in {log_dir or 'devnull'}")
+            raise ServerFailed(f"server did not become healthy (exit={rc}); "
+                               f"see log in {log_dir or 'devnull'}")
         if verbose:
             print(f"    ready in {started:.0f}s", flush=True)
-        for i in range(reps):
-            tps, pre = _generate(cfg.host, cfg.port, n_tokens)
-            if tps:
-                samples.append(tps)
-            if pre:
-                prefill.append(pre)
-            peak = max(peak, gpu_used_bytes())
-            if verbose:
-                print(f"    rep{i}: {tps:.2f} tok/s  (prefill {pre:.1f})", flush=True)
-        return RunResult(cfg, samples, prefill, peak, started, True)
-    except Exception as e:                                  # noqa: BLE001
-        err = f"{type(e).__name__}: {e}"
-        return RunResult(cfg, samples, prefill, peak, 0.0, False, err)
+        yield started
     finally:
         _stop(proc)
         if logf:
             logf.close()
+
+
+def run_config(cfg: RunConfig, binary: str, reps=3, n_tokens=400,
+               startup_timeout=1200, log_dir=None, verbose=True) -> RunResult:
+    """Start a server, measure it `reps` times, stop it. Always cleans up."""
+    samples, prefill, peak = [], [], 0
+    try:
+        with server(cfg, binary, startup_timeout, log_dir, verbose) as started:
+            for i in range(reps):
+                tps, pre, _ = _generate(cfg.host, cfg.port, n_tokens)
+                if tps:
+                    samples.append(tps)
+                if pre:
+                    prefill.append(pre)
+                peak = max(peak, gpu_used_bytes())
+                if verbose:
+                    print(f"    rep{i}: {tps:.2f} tok/s", flush=True)
+            return RunResult(cfg, samples, prefill, peak, started, True)
+    except ServerFailed as e:
+        return RunResult(cfg, [], [], 0, 0.0, False, str(e))
+    except Exception as e:                                  # noqa: BLE001
+        return RunResult(cfg, samples, prefill, peak, 0.0, False,
+                         f"{type(e).__name__}: {e}")
 
 
 def _stop(proc, grace=60):

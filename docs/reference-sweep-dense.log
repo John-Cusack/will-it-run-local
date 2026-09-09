@@ -1,0 +1,72 @@
+
+1. Hardware
+-----------
+  AMD EPYC 7B12 64-Core Processor, 64 physical cores
+  NVIDIA GeForce RTX 3090, 24.0 GiB VRAM
+  measuring memory bandwidth (a few seconds)...
+    stream: 24.8 GB/s peak, 24.5 median (64 threads, 32 GiB)
+
+2. Pre-flight
+-------------
+  [WARN] swap: 2.05 GiB of swap in use.
+         Small, but re-check after loading the model.
+  [WARN] dimm-population: EDAC reports 256 GiB installed but the kernel sees 216 GiB -- a 40 GiB gap.
+         That gap is about the size of one or more DIMMs. If a memory channel is
+         unpopulated you lose bandwidth in proportion, and no software setting
+         recovers it. Confirm with `sudo dmidecode -t memory` and compare the
+         number of populated slots against your CPU's channel count.
+  nothing blocking.
+
+3. Search space
+---------------
+  The cost model is used here and nowhere else: to pick which configurations are
+  worth launching. Everything reported below this point is measured.
+
+  model is dense, 28 layers, 0.85 GB read per token
+  no draft model given -- `wirl find-draft <model>` searches for a compatible one
+  predicted starting point: --n-gpu-layers 28 (bracketing 27..28 empirically)
+
+4. VRAM boundary (measured)
+---------------------------
+  Bisecting by actually launching the server. A predicted boundary is a guess
+  about allocator behaviour; the real one is wherever it stops starting.
+
+  bracketing the VRAM boundary between --n-gpu-layers 27 and 28
+    trying --n-gpu-layers 27 ... starts (2779 MiB)
+    trying --n-gpu-layers 28 ... starts (2837 MiB)
+  largest --n-gpu-layers that starts: 28
+
+5. Throughput (measured)
+------------------------
+  2 repetitions each, one configuration at a time, spread reported.
+
+  measuring --n-gpu-layers 28
+    ready in 2s
+    rep0: 336.50 tok/s
+    rep1: 340.61 tok/s
+  measuring --n-gpu-layers 27
+    ready in 2s
+    rep0: 318.67 tok/s
+    rep1: 325.30 tok/s
+
+Measured results
+----------------
+| config | tok/s | spread | peak VRAM | startup |
+|---|---|---|---|---|
+| ngl=28 t=auto ctx=8192 | 338.55 | 1.2% | 2837 MiB | 2s |
+| ngl=27 t=auto ctx=8192 | 321.98 | 2.1% | 2779 MiB | 2s |
+
+Recommended
+-----------
+  ngl=28 t=auto ctx=8192  ->  338.55 tok/s (spread 1.2%), 2837 MiB peak VRAM
+  fastest measured
+
+  For reference the cost model predicted 1106.12 tok/s at --n-gpu-layers 28;
+  measured is -69% against that. The measured number is the one to trust.
+
+  Decode is GPU-bound (100% of each token is read from VRAM), where the
+  bandwidth roofline does not apply -- it ignores per-token fixed costs.
+  Measured 338.55 tok/s is the only meaningful figure here.
+
+  wrote launch script: /tmp/claude-1000/-home-john/de642172-3551-49c1-a658-511215708a2f/scratchpad/run-dense.sh
+  wrote systemd unit:  /tmp/claude-1000/-home-john/de642172-3551-49c1-a658-511215708a2f/scratchpad/run-dense.sh.service

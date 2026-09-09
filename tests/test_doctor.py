@@ -79,3 +79,20 @@ def test_model_larger_than_ram_is_blocking():
 def test_offloading_to_gpu_can_make_it_fit():
     c = doctor.check_ram_for_model(_mem(available=100 * GiB), 156 * GiB, 80 * GiB)
     assert c.status == doctor.OK
+
+
+def test_missing_llama_server_is_blocking(monkeypatch):
+    """The most likely first failure for anyone cloning the repo."""
+    import wirl.runner
+    monkeypatch.setattr(wirl.runner, "find_server", lambda e=None: None)
+    c = doctor.check_llama_server()
+    assert c.status == doctor.FAIL
+    assert "GGML_CUDA=ON" in c.fix
+
+
+def test_llama_server_found_is_reported(monkeypatch):
+    import wirl.runner
+    monkeypatch.setattr(wirl.runner, "find_server", lambda e=None: "/bin/true")
+    c = doctor.check_llama_server()
+    assert c.status in (doctor.OK, doctor.WARN)
+    assert "/bin/true" in c.detail

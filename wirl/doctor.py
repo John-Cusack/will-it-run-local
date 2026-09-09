@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 from dataclasses import dataclass
 
 OK, WARN, FAIL = "ok", "warn", "fail"
@@ -197,12 +198,73 @@ def check_disk(path, need_bytes) -> Check:
     return Check("disk", OK, f"{_gib(free):.0f} GiB free at {path}.")
 
 
-def run_all(model_bytes=None, gpu_bytes=0, cache_type_k="f16", path=".") -> list:
+def check_llama_server(explicit=None) -> Check:
+    """Is there a usable llama-server, and was it built with CUDA?
+
+    The most likely first failure for anyone cloning this: no binary, or one
+    built CPU-only, which produces a confusing error deep inside a sweep
+    instead of a clear message up front.
+    """
+    from .runner import find_server
+    binary = find_server(explicit)
+    if not binary:
+        return Check("llama.cpp", FAIL, "no llama-server binary found.",
+                     "Build llama.cpp with CUDA, then either put llama-server "
+                     "on PATH, set WIRL_LLAMA_SERVER=/path/to/llama-server, or "
+                     "pass --llama-server. Build with: cmake -B build "
+                     "-DGGML_CUDA=ON && cmake --build build -j --target "
+                     "llama-server")
+
+    # llama-server writes its banner to stderr, so both streams are needed.
+    blob = ""
+    try:
+        p = subprocess.run([binary, "--version"], capture_output=True, text=True,
+                           timeout=30)
+        blob = (p.stdout or "") + (p.stderr or "")
+    except (OSError, subprocess.SubprocessError):
+        pass
+    version = ""
+    for line in blob.splitlines():
+        if "version" in line.lower() or "build" in line.lower():
+            version = line.strip()
+            break
+
+    # llama-server prints its detected backends on startup, not for --version,
+    # so fall back to checking that a CUDA backend library was linked or built.
+    cuda = ("CUDA" in blob or "cuda" in blob)
+    if not cuda:
+        d = os.path.dirname(binary)
+        for probe in ("libggml-cuda.so", "../lib/libggml-cuda.so"):
+            if os.path.exists(os.path.join(d, probe)):
+                cuda = True
+                break
+        if not cuda:
+            # A statically linked CUDA build leaves no .so; look for the symbol.
+            try:
+                ldd = subprocess.run(["ldd", binary], capture_output=True,
+                                     text=True, timeout=20).stdout or ""
+            except (OSError, subprocess.SubprocessError):
+                ldd = ""
+            cuda = "cuda" in ldd.lower()
+
+    detail = f"{binary}" + (f" ({version})" if version else "")
+    if not cuda:
+        return Check("llama.cpp", WARN, detail + " -- could not confirm CUDA support.",
+                     "If this binary is CPU-only, every GPU offload flag is "
+                     "silently ignored and the sweep will measure nothing "
+                     "useful. Rebuild with -DGGML_CUDA=ON, or continue if you "
+                     "know it is a GPU build.")
+    return Check("llama.cpp", OK, detail + ", CUDA support detected.")
+
+
+def run_all(model_bytes=None, gpu_bytes=0, cache_type_k="f16", path=".",
+            llama_server=None) -> list:
     from .lock import foreign_gpu_users
     from .probe import cpu_info, gpu_info, mem_info
 
     cpu, mem, gpus = cpu_info(), mem_info(), gpu_info()
     checks = [
+        check_llama_server(llama_server),
         check_isa(cpu),
         check_gpu_free(gpus, foreign_gpu_users()),
         check_swap(mem),

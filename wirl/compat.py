@@ -77,6 +77,12 @@ def compare(target_sig: dict, draft_sig: dict) -> dict:
             "warnings": warnings, "target": target_sig, "draft": draft_sig}
 
 
+def check_remote_sig(repo: str, filename: str) -> dict:
+    """Vocabulary fingerprint of a remote GGUF, header bytes only."""
+    from .gguf import read_header_only
+    return read_header_only(resolve_url(repo, filename)).vocab_sig()
+
+
 def check_remote(target_path: str, repo: str, filename: str) -> dict:
     """Vet a HuggingFace-hosted draft against a local target. No full download."""
     from .gguf import read_header_only, read_one

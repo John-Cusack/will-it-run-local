@@ -69,3 +69,26 @@ def test_lock_is_released_after_use(tmp_path, monkeypatch):
         pass
     with L.benchmark_lock():
         pass
+
+
+def _ok(label_cfg, mean):
+    from wirl.runner import RunResult
+    return RunResult(label_cfg, [mean], [], 0, 0.0, True)
+
+
+def test_repeatability_reports_cross_launch_spread():
+    """A config measured in several phases is an accidental control: it gives
+    the real uncertainty on every other comparison in the table."""
+    from wirl import tune
+    cfg = RunConfig(model="/m", n_cpu_moe=43, threads=32)
+    out = tune.repeatability([_ok(cfg, 9.90), _ok(cfg, 10.01), _ok(cfg, 10.08)])
+    assert "measured 3x" in out
+    assert "1.8%" in out
+    assert "noise, not findings" in out
+
+
+def test_repeatability_silent_when_nothing_repeats():
+    from wirl import tune
+    a = RunConfig(model="/m", n_cpu_moe=42)
+    b = RunConfig(model="/m", n_cpu_moe=43)
+    assert tune.repeatability([_ok(a, 9.9), _ok(b, 10.0)]) == ""

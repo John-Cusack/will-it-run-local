@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import os
 import sys
 
-from . import compat, doctor, emit, gguf, membw, model, predict, probe, report, tune
+from . import (compat, doctor, drafters, emit, gguf, membw, model, predict,
+               probe, recommend, report, search, tune)
 from .lock import BenchmarkBusy, benchmark_lock, foreign_gpu_users
 from .report import c, gb, gib, head, para
+from . import runner
 from .runner import RunConfig, find_server
 
 
@@ -236,6 +239,419 @@ def cmd_plan(args):
              "measurement before trusting them.", indent="  ")
 
 
+def run_cfg_measure(cfg, binary, args):
+    from .runner import run_config
+    return run_config(cfg, binary, reps=args.reps, n_tokens=args.tokens,
+                      log_dir=args.log_dir)
+
+
+def cmd_auto(args):
+    """Probe, check, sweep for real, emit. The whole job, measured."""
+    binary = find_server(args.llama_server)
+    if not binary:
+        sys.exit("error: could not find llama-server. Pass --llama-server PATH "
+                 "or set WIRL_LLAMA_SERVER.")
+    g, mc = _load(args.model)
+    dg = dmc = None
+    if args.draft:
+        dg, dmc = _load(args.draft, "draft model")
+        comp = compat.compare(g.vocab_sig(), dg.vocab_sig())
+        if not comp["compatible"]:
+            print(c("  draft model is NOT compatible:", report.RED))
+            for prob in comp["problems"]:
+                report.para(prob)
+            return 1
+
+    # ---- 1. hardware -----------------------------------------------------
+    head("1. Hardware")
+    cpu = probe.cpu_info()
+    gpu, budget, bw_gpu = _gpu_choice(args)
+    print(f"  {cpu['model']}, {cpu['physical']} physical cores")
+    if gpu:
+        print(f"  {gpu['name']}, {gib(gpu['vram_total']):.1f} GiB VRAM")
+    else:
+        sys.exit("error: no GPU detected; `wirl auto` tunes a CPU+GPU split.")
+    bw_cpu, bw_desc = _bandwidth(args)
+
+    # ---- 2. pre-flight ---------------------------------------------------
+    head("2. Pre-flight")
+    checks = doctor.run_all(mc.total_bytes, 0, cache_type_k=args.cache_type_k,
+                            llama_server=args.llama_server)
+    report.print_checks(checks, show_ok=False)
+    blocking = [ch for ch in checks if ch.status == doctor.FAIL]
+    if blocking and not args.force:
+        print()
+        para("Refusing to sweep with blocking problems outstanding: any number "
+             "measured now would be wrong. Fix them, or pass --force.")
+        return 1
+    if not blocking:
+        print("  nothing blocking.")
+
+    # ---- 3. narrow the search space --------------------------------------
+    head("3. Search space")
+    para("The cost model is used here and nowhere else: to pick which "
+         "configurations are worth launching. Everything reported below this "
+         "point is measured.")
+    print()
+    # A dense model has no routed experts, so --n-cpu-moe does nothing:
+    # bisecting it would launch several identical servers and call the
+    # resulting noise a result. The knob there is --n-gpu-layers.
+    moe = mc.is_moe
+    knob = "--n-cpu-moe" if moe else "--n-gpu-layers"
+    if moe:
+        best_pred, _ = predict.best_fit(mc, g, bw_cpu, bw_gpu, budget, args.ctx,
+                                        headroom=args.headroom * 1e9,
+                                        draft_mc=dmc, draft_g=dg)
+        start = best_pred.n_cpu_moe if best_pred else mc.n_layer
+        lo = max(0, start - args.span - 2)
+        hi = min(mc.n_layer, start + args.span)
+    else:
+        best_pred, _ = predict.best_fit_dense(mc, g, bw_cpu, bw_gpu, budget,
+                                              args.ctx,
+                                              headroom=min(args.headroom * 1e9, 1e9))
+        start = best_pred.n_cpu_moe if best_pred else 0
+        lo = max(0, start - args.span)
+        hi = min(mc.n_layer, start + args.span + 2)
+    print(f"  model is {'MoE' if moe else 'dense'}, {mc.n_layer} layers, "
+          f"{gb(mc.bytes_per_token):.2f} GB read per token")
+    if not dg:
+        # Speculative decoding was worth +33% on the reference machine. Worth
+        # a pointer, but not worth a surprise multi-GB download.
+        print("  no draft model given -- `wirl find-draft <model>` searches for "
+              "a compatible one")
+    print(f"  predicted starting point: {knob} {start} "
+          f"(bracketing {lo}..{hi} empirically)")
+
+    base = RunConfig(model=g.path, ctx=args.ctx, threads=args.threads,
+                     cache_type_k=args.cache_type_k,
+                     draft_model=dg.path if dg else None,
+                     draft_n_max=args.draft_n_max, port=args.port)
+    log = search.SearchLog()
+
+    try:
+        with benchmark_lock(wait=args.wait):
+            # ---- 4. find the real VRAM edge ------------------------------
+            head("4. VRAM boundary (measured)")
+            para("Bisecting by actually launching the server. A predicted "
+                 "boundary is a guess about allocator behaviour; the real one "
+                 "is wherever it stops starting.")
+            print()
+            finder = search.find_vram_edge if moe else search.find_ngl_edge
+            edge = finder(base, binary, lo, hi, log=log, log_dir=args.log_dir)
+            if edge is None:
+                print()
+                para("Nothing in that range started. Reduce --ctx-size, drop "
+                     "the draft model, or use a smaller quantisation.")
+                return 1
+            print(f"  {'smallest' if moe else 'largest'} {knob} that starts: {edge}")
+
+            # ---- 5. measure ----------------------------------------------
+            head("5. Throughput (measured)")
+            para(f"{args.reps} repetitions each, one configuration at a time, "
+                 "spread reported.")
+            print()
+            results = search.measure_around(base, binary, edge, span=args.span,
+                                            reps=args.reps, n_tokens=args.tokens,
+                                            log=log, log_dir=args.log_dir,
+                                            max_layer=mc.n_layer, moe=moe)
+            if dg and args.depth_sweep:
+                ok = [r for r in results if r.ok and r.samples]
+                if ok:
+                    head("6. Draft depth (measured)")
+                    para("Shallow first, stopping as soon as depth stops "
+                         "paying -- on sparse MoE it usually does not.")
+                    print()
+                    b2 = copy.copy(max(ok, key=lambda r: r.mean).config)
+                    results += tune.sweep_draft_depth(
+                        b2, binary, (1, 2, 3), reps=args.reps,
+                        n_tokens=args.tokens, log_dir=args.log_dir)
+            if args.thread_sweep:
+                ok = [r for r in results if r.ok and r.samples]
+                if ok:
+                    head("7. Thread count (measured)")
+                    para("Usually a null result on a bandwidth-bound model. "
+                         "If it is flat, that is the finding.")
+                    print()
+                    b3 = copy.copy(max(ok, key=lambda r: r.mean).config)
+                    counts = sorted({24, 32, 48, cpu["physical"]})
+                    results += tune.sweep_threads(
+                        b3, binary, counts, reps=args.reps,
+                        n_tokens=args.tokens, log_dir=args.log_dir)
+    except BenchmarkBusy as e:
+        sys.exit(f"error: {e}")
+
+    # ---- results ---------------------------------------------------------
+    head("Measured results")
+    _RESULTS_MARK = None
+    print(tune.summarise(results))
+    rep = tune.repeatability(results)
+    if rep:
+        print()
+        print(rep)
+    unstable = tune.flag_unstable(results)
+    if unstable:
+        print()
+        print(c("  " + unstable[0], report.YEL))
+        for line in unstable[1:]:
+            print(f"  {line}")
+
+    winner, why = search.pick_recommended(results, gpu["vram_total"],
+                                          int(args.headroom * 1e9))
+    if winner is None:
+        sys.exit("no configuration completed successfully.")
+
+    head("Recommended")
+    print(f"  {winner.config.label()}  ->  {winner.mean:.2f} tok/s "
+          f"(spread {winner.spread_pct:.1f}%), {winner.peak_vram >> 20} MiB peak VRAM")
+    print(f"  {why}")
+    print()
+
+    # ---- phase C: what a real conversation feels like ---------------------
+    depth_points = []
+    if not args.no_depth:
+        head("Long-context behaviour (measured)")
+        para("Everything above used an almost-empty context. These run against "
+             "one already-running server, so they cost seconds rather than "
+             "another startup.")
+        print()
+        wcfg = copy.copy(winner.config)
+        depths = [0] + [d for d in (2048, 8192, 16384, 32768)
+                        if d <= args.ctx * 0.85]
+        try:
+            with benchmark_lock(wait=args.wait):
+                with runner.server(wcfg, binary, log_dir=args.log_dir) as _:
+                    depth_points = search.profile_depth(
+                        wcfg, wcfg.host, wcfg.port, depths=depths,
+                        gen_tokens=args.depth_tokens)
+        except (BenchmarkBusy, runner.ServerFailed) as e:
+            print(f"  skipped: {e}")
+        if depth_points:
+            print()
+            print(search.summarise_depth(depth_points, args.ctx))
+
+    # ---- second context length -------------------------------------------
+    if args.ctx2:
+        head(f"Same config at --ctx-size {args.ctx2} (measured)")
+        para("A longer context costs VRAM for the KV cache, which can force "
+             "more experts back onto the CPU. This measures whether it does.")
+        print()
+        c2 = copy.copy(winner.config)
+        c2.ctx = args.ctx2
+        try:
+            with benchmark_lock(wait=args.wait):
+                r2 = run_cfg_measure(c2, binary, args)
+        except BenchmarkBusy as e:
+            r2 = None
+            print(f"  skipped: {e}")
+        if r2 and r2.ok:
+            d = (r2.mean - winner.mean) / winner.mean * 100
+            print(f"  {r2.mean:.2f} tok/s (spread {r2.spread_pct:.1f}%), "
+                  f"{r2.peak_vram >> 20} MiB peak VRAM  -> {d:+.1f}% vs "
+                  f"ctx {args.ctx}")
+            results.append(r2)
+        elif r2:
+            print(f"  does not run at ctx {args.ctx2}: {r2.error}")
+            para(f"Stay at --ctx-size {args.ctx}.")
+
+    if best_pred:
+        delta = (winner.mean - best_pred.tps) / best_pred.tps * 100
+        para(f"For reference the cost model predicted {best_pred.tps:.2f} tok/s "
+             f"at {knob} {best_pred.n_cpu_moe}; measured is {delta:+.0f}% "
+             "against that. The measured number is the one to trust.")
+        print()
+    for line in predict.verdict(mc, best_pred, bw_cpu, measured_tps=winner.mean):
+        report.para(line)
+        print()
+
+    out = args.emit or "./run-llama.sh"
+    cfg = copy.copy(winner.config)
+    cfg.host, cfg.port = args.emit_host, args.emit_port
+    notes = (f"Chosen by measurement: {winner.mean:.2f} tok/s over {args.reps} runs "
+             f"(spread {winner.spread_pct:.1f}%), {winner.peak_vram >> 20} MiB peak VRAM.\n"
+             f"VRAM boundary found empirically at --n-cpu-moe {edge}.\n"
+             f"Measured RAM bandwidth at the time: {bw_cpu/1e9:.0f} GB/s.")
+    emit.write(out, emit.launch_script(cfg, binary,
+                                       physical_cores=cpu["physical"],
+                                       extra_comment=notes), 0o755)
+    print(f"  wrote launch script: {out}")
+    unit_path = out + ".service"
+    emit.write(unit_path, emit.systemd_unit(
+        os.path.abspath(out), f"llama.cpp - {os.path.basename(g.path)}", notes))
+    print(f"  wrote systemd unit:  {unit_path}")
+    return 0
+
+
+def cmd_recommend(args):
+    """Which quantisation of a model should this machine download?"""
+    try:
+        files = compat.list_gguf(args.repo)
+    except Exception as e:                                   # noqa: BLE001
+        sys.exit(f"error: could not list {args.repo}: {e}")
+    if not files:
+        sys.exit(f"error: no GGUF files found in {args.repo}")
+
+    cands = recommend.group_shards(files)
+    if args.filter:
+        f = args.filter.lower()
+        cands = [c for c in cands if f in c.name.lower()]
+        if not cands:
+            sys.exit(f"error: no quantisation matching '{args.filter}'")
+
+    gpu, budget, bw_gpu = _gpu_choice(args)
+    ram = (args.ram * (1 << 30)) if args.ram else probe.mem_info()["available"]
+    bw_cpu, bw_desc = _bandwidth(args)
+
+    head("Your machine")
+    cpu = probe.cpu_info()
+    print(f"  {cpu['physical']} cores, {gib(ram):.0f} GiB RAM available, "
+          f"{bw_desc} memory bandwidth")
+    if gpu:
+        print(f"  {gpu['name']}, {gib(budget):.1f} GiB VRAM")
+    else:
+        print("  no GPU -- everything runs on the CPU")
+        budget, bw_gpu = 0, 1.0
+
+    head(f"{args.repo}")
+    print(f"  reading headers for {len(cands)} quantisation(s) over HTTP Range "
+          "(no model download)...")
+    ready = []
+    for cnd in cands:
+        try:
+            recommend.load_remote(args.repo, cnd)
+        except Exception as e:                               # noqa: BLE001
+            print(f"    {cnd.name}: could not read header ({e})")
+            continue
+        recommend.evaluate(cnd, bw_cpu, bw_gpu, budget, ram, args.ctx,
+                           headroom=args.headroom * 1e9)
+        ready.append(cnd)
+    if not ready:
+        sys.exit("error: could not read any model headers.")
+
+    best, why = recommend.choose(ready, min_tps=args.min_tps)
+
+    head("What you can run")
+    print(f"  {'quant':<12} {'size':>9}  {'tok/s':>7}  {'where':<22} config")
+    for cnd in ready:
+        if not cnd.fits_at_all:
+            print(f"  {cnd.name:<12} {gb(cnd.size):8.1f} GB  {'--':>7}  "
+                  + c(cnd.note, report.RED))
+            continue
+        where = ("all on GPU" if cnd.fits_vram
+                 else f"{gib(cnd.ram_needed):.1f} GiB in RAM")
+        cfg = ("-ngl 99" if cnd.fits_vram else f"{cnd.knob} {cnd.knob_value}")
+        mark = "  <-- " + why if best is cnd else ""
+        if cnd.confidence == "ceiling":
+            # GPU-bound: the roofline is a loose upper bound and this tool has
+            # no measurements in that regime. Do not state a figure at all.
+            speed = c(f"{'fast':>7}", report.GRN)
+        else:
+            # "~" marks a number whose GPU term is uncalibrated.
+            txt = (f"{cnd.tps:7.1f}" if cnd.confidence == "calibrated"
+                   else f"{'~' + format(cnd.tps, '.0f'):>7}")
+            speed = c(txt, report.GRN if cnd.tps >= args.min_tps else report.YEL)
+        print(f"  {cnd.name:<12} {gb(cnd.size):8.1f} GB  {speed}  {where:<22} {cfg}{mark}")
+
+    runnable = [x for x in ready if x.fits_at_all]
+    if any(x.confidence == "ceiling" for x in runnable):
+        print()
+        para('"fast" means decode is GPU-bound. This tool is calibrated for the '
+             "CPU-offload regime and has no measurements for that one, so it "
+             "reports no number rather than a roofline figure that would be "
+             "several times too optimistic. Expect comfortably interactive.")
+    if any(x.confidence == "mixed" for x in runnable):
+        print()
+        para('"~" marks a figure where a meaningful share of each token is read '
+             "from the GPU. The CPU side is calibrated against measurement; the "
+             "GPU side is an uncalibrated roofline, so treat these as optimistic.")
+
+    head("Recommendation")
+    if best is None:
+        para("Nothing in this repository fits this machine. Look for a smaller "
+             "model, or a more aggressive quantisation than this repo offers.")
+        return 1
+    if best.fits_vram or best.confidence in ("ceiling", "mixed"):
+        where = ("It fits on the GPU, so it will be comfortably fast."
+                 if best.fits_vram else
+                 f"About {gib(best.ram_needed):.1f} GiB sits in system RAM; "
+                 f"expect somewhat under {best.tps:.0f} tok/s.")
+        para(f"Download {c(best.name, report.BOLD)} ({gb(best.size):.1f} GB). {where}")
+    else:
+        para(f"Download {c(best.name, report.BOLD)} ({gb(best.size):.1f} GB). "
+             f"Predicted {best.tps:.1f} tok/s, with "
+             f"{gib(best.ram_needed):.1f} GiB of it in system RAM.")
+    print()
+    print(f"  hf download {args.repo} --include '*{best.name}*' --local-dir ./models")
+    print()
+    para("Then run `wirl plan` on the downloaded file to confirm, and "
+         "`wirl tune` to verify by measurement.")
+    return 0
+
+
+def cmd_find_draft(args):
+    """Search for a speculative-decoding drafter and vet it, without downloading."""
+    g, mc = _load(args.model)
+    sig = g.vocab_sig()
+    head("Target")
+    print(f"  {os.path.basename(g.path)}")
+    print(f"  arch {sig['arch']}, vocab {sig['n_vocab']}, sha {sig['vocab_sha256_16']}")
+
+    head("Searching HuggingFace")
+    print("  " + ", ".join(f'"{q}"' for q in drafters.candidate_queries(g)))
+    cands = drafters.find_candidates(g)
+    if not cands:
+        para("No candidate repositories found. That is not proof none exist -- "
+             "search only sees public repos with GGUF files.")
+        return 1
+    print(f"  {len(cands)} candidate repositories; checking headers over HTTP "
+          "Range (no downloads)")
+
+    head("Results")
+    good, checked = [], 0
+    for cnd in cands[:args.max_repos]:
+        rows = drafters.vet(sig, cnd["repo"], max_files=args.max_files,
+                            max_gb=args.max_gb)
+        for r in rows:
+            checked += 1
+            if r.get("error"):
+                continue
+            tag = "purpose-built" if cnd["purpose_built"] else "sibling"
+            if r["compatible"] and not r["warnings"]:
+                print("  " + c("OK  ", report.GRN)
+                      + f" {r['size']/1e9:6.2f} GB  {r['repo']}/{r['file']}")
+                print(f"        arch {r['sig']['arch']}, vocab matches, {tag}")
+                good.append(r)
+            elif r["compatible"]:
+                print("  " + c("WARN", report.YEL)
+                      + f" {r['size']/1e9:6.2f} GB  {r['repo']}/{r['file']}")
+                for w in r["warnings"]:
+                    report.para(w, indent="        ")
+                good.append(r)
+            elif args.verbose:
+                print("  " + c("no  ", report.RED)
+                      + f" {r['size']/1e9:6.2f} GB  {r['repo']}/{r['file']}")
+                for pr in r["problems"]:
+                    report.para(pr, indent="        ")
+
+    head("Summary")
+    print(f"  checked {checked} files, {len(good)} could pair with this target")
+    if not good:
+        para("Nothing compatible found. Speculative decoding needs an identical "
+             "vocabulary, which is rarer than it sounds; run without a draft "
+             "model.")
+        return 1
+    best = min(good, key=lambda r: r["size"])
+    print()
+    para(f"Smallest compatible: {best['repo']}/{best['file']} "
+         f"({best['size']/1e9:.2f} GB). A drafter must be small to pay for "
+         "itself, so prefer the smallest that still drafts well.")
+    print()
+    print(f"  hf download {best['repo']} {best['file']} --local-dir ./drafts")
+    print()
+    para("Then pass it to `wirl auto --draft`, which will sweep draft depth "
+         "and tell you whether it is actually helping on your hardware.")
+    return 0
+
+
 def cmd_doctor(args):
     model_bytes = gpu_bytes = 0
     if args.model:
@@ -248,7 +664,8 @@ def cmd_doctor(args):
     head("Pre-flight checks")
     checks = doctor.run_all(model_bytes or None, gpu_bytes,
                             cache_type_k=args.cache_type_k,
-                            path=os.path.dirname(args.model) if args.model else ".")
+                            path=os.path.dirname(args.model) if args.model else ".",
+                            llama_server=args.llama_server)
     report.print_checks(checks)
     fails = [c_ for c_ in checks if c_.status == "fail"]
     warns = [c_ for c_ in checks if c_.status == "warn"]
@@ -355,6 +772,10 @@ def cmd_tune(args):
 
     head("Results")
     print(tune.summarise(results))
+    rep = tune.repeatability(results)
+    if rep:
+        print()
+        print(rep)
     unstable = tune.flag_unstable(results)
     if unstable:
         print()
@@ -418,10 +839,12 @@ def build_parser():
         description="Predict and tune local LLM inference from measured hardware limits.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""examples:
+  wirl auto model.gguf --draft draft.gguf     # measure everything, emit a launcher
   wirl probe
   wirl inspect model.gguf
   wirl plan model.gguf --draft draft.gguf --ctx 16384
   wirl doctor --model model.gguf
+  wirl recommend unsloth/Qwen3-30B-A3B-GGUF
   wirl check-draft model.gguf --repo someone/drafter-GGUF
   wirl tune model.gguf --draft draft.gguf --emit ./run-llama.sh
 """)
@@ -440,6 +863,43 @@ def build_parser():
         sp.add_argument("--vram", type=float, metavar="GIB",
                         help="override usable VRAM budget")
 
+    sp = sub.add_parser("auto",
+                        help="THE MAIN COMMAND: probe, check, sweep for real, emit a launcher")
+    sp.add_argument("model")
+    sp.add_argument("--draft")
+    sp.add_argument("--ctx", type=int, default=16384)
+    sp.add_argument("--threads", type=int)
+    sp.add_argument("--cache-type-k", default="f16")
+    sp.add_argument("--draft-n-max", type=int, default=1)
+    sp.add_argument("--depth-sweep", action="store_true",
+                    help="also sweep speculative draft depth")
+    sp.add_argument("--thread-sweep", action="store_true",
+                    help="also sweep thread count at the winner")
+    sp.add_argument("--no-depth", action="store_true",
+                    help="skip the long-context prefill/decode profile")
+    sp.add_argument("--depth-tokens", type=int, default=120,
+                    help="tokens to generate per long-context probe")
+    sp.add_argument("--ctx2", type=int,
+                    help="also measure the winner at a second context length")
+    sp.add_argument("--span", type=int, default=2,
+                    help="how many configs above the VRAM edge to measure")
+    sp.add_argument("--reps", type=int, default=3,
+                    help="repetitions per config (spread is reported)")
+    sp.add_argument("--tokens", type=int, default=400)
+    sp.add_argument("--headroom", type=float, default=3.0, metavar="GB")
+    sp.add_argument("--port", type=int, default=38080)
+    sp.add_argument("--llama-server")
+    sp.add_argument("--log-dir")
+    sp.add_argument("--emit", metavar="PATH", default=None)
+    sp.add_argument("--emit-host", default="127.0.0.1")
+    sp.add_argument("--emit-port", type=int, default=8080)
+    sp.add_argument("--force", action="store_true",
+                    help="sweep even with blocking problems (results will be wrong)")
+    sp.add_argument("--wait", action="store_true")
+    bw_opts(sp)
+    gpu_opts(sp)
+    sp.set_defaults(func=cmd_auto)
+
     sp = sub.add_parser("probe", help="report hardware, including measured bandwidth")
     bw_opts(sp)
     sp.set_defaults(func=cmd_probe)
@@ -450,7 +910,8 @@ def build_parser():
     bw_opts(sp)
     sp.set_defaults(func=cmd_inspect)
 
-    sp = sub.add_parser("plan", help="recommend a configuration without running anything")
+    sp = sub.add_parser("plan",
+                        help="ESTIMATE a configuration without running anything (prefer `auto`, which measures)")
     sp.add_argument("model")
     sp.add_argument("--draft", help="speculative decoding draft model")
     sp.add_argument("--ctx", type=int, default=16384)
@@ -460,8 +921,35 @@ def build_parser():
     gpu_opts(sp)
     sp.set_defaults(func=cmd_plan)
 
+    sp = sub.add_parser("recommend",
+                        help="which quantisation should THIS machine download?")
+    sp.add_argument("repo", help="HuggingFace repo id, e.g. unsloth/Qwen3-30B-A3B-GGUF")
+    sp.add_argument("--ctx", type=int, default=8192)
+    sp.add_argument("--min-tps", type=float, default=5.0,
+                    help="slowest acceptable speed (default 5 tok/s)")
+    sp.add_argument("--filter", help="only consider quants matching this substring")
+    sp.add_argument("--ram", type=float, metavar="GIB",
+                    help="pretend this much system RAM is free "
+                         "(for 'what if I upgraded' questions)")
+    sp.add_argument("--headroom", type=float, default=3.0)
+    bw_opts(sp)
+    gpu_opts(sp)
+    sp.set_defaults(func=cmd_recommend)
+
+    sp = sub.add_parser("find-draft",
+                        help="search for a speculative-decoding drafter and vet it")
+    sp.add_argument("model")
+    sp.add_argument("--max-repos", type=int, default=6)
+    sp.add_argument("--max-files", type=int, default=4)
+    sp.add_argument("--max-gb", type=float, default=None,
+                    help="ignore candidate files larger than this")
+    sp.add_argument("--verbose", action="store_true",
+                    help="also show incompatible candidates and why")
+    sp.set_defaults(func=cmd_find_draft)
+
     sp = sub.add_parser("doctor", help="check for conditions that silently ruin results")
     sp.add_argument("--model")
+    sp.add_argument("--llama-server")
     sp.add_argument("--cache-type-k", default="f16")
     sp.set_defaults(func=cmd_doctor)
 

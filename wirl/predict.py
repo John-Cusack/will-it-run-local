@@ -167,7 +167,8 @@ def verdict(mc, best, bw_cpu, measured_tps=None):
         return lines
 
     cpu_share = best.cpu_ms / (best.cpu_ms + best.gpu_ms) if (best.cpu_ms + best.gpu_ms) else 0
-    if cpu_share > 0.8:
+    over_roofline = bool(measured_tps and best.tps and measured_tps > best.tps * 1.1)
+    if cpu_share > 0.8 and not over_roofline:
         lines.append(
             f"Bandwidth-bound: {cpu_share*100:.0f}% of each token is spent reading "
             f"experts from system RAM at {bw_cpu/1e9:.0f} GB/s. Thread count and "
@@ -177,7 +178,34 @@ def verdict(mc, best, bw_cpu, measured_tps=None):
             "faster RAM, or a smaller quantisation.")
     if measured_tps:
         ratio = measured_tps / best.tps if best.tps else 0
-        if ratio > 0.9:
+        if cpu_share < 0.30:
+            # GPU-bound. The bandwidth roofline ignores kernel launch overhead,
+            # attention and sampling, all of which dominate once a model fits
+            # in VRAM: 340 tok/s is 2.9 ms per token, which is not a bandwidth
+            # number. This tool is calibrated for the CPU-offload regime, so it
+            # says nothing rather than raising a false alarm.
+            lines.append(
+                f"Decode is GPU-bound ({(1-cpu_share)*100:.0f}% of each token "
+                "is read from VRAM), where the bandwidth roofline does not "
+                f"apply -- it ignores per-token fixed costs. Measured "
+                f"{measured_tps:.2f} tok/s is the only meaningful figure here.")
+        elif ratio > 1.1:
+            # Beating the roofline does not mean the machine is fast; it means
+            # the roofline was wrong. The model charges every routed expert to
+            # DRAM on every token, but with a large last-level cache and skewed
+            # top-k routing, hot experts stay resident and are not re-read.
+            # Measured 10.43 tok/s against a 5.17 tok/s roofline on the
+            # reference machine -- 202% -- for exactly this reason.
+            lines.append(
+                f"Measured {measured_tps:.2f} tok/s EXCEEDS the {best.tps:.2f} "
+                f"tok/s roofline ({ratio*100:.0f}%). That means the estimate is "
+                "wrong, not that the machine is exceptional.")
+            lines.append(
+                "The usual cause is expert cache reuse: the cost model charges "
+                "every routed expert to DRAM on every token, but hot experts "
+                "stay in last-level cache and are not re-read. Trust the "
+                "measurement; treat the roofline as a floor for this model.")
+        elif ratio > 0.9:
             lines.append(
                 f"Measured {measured_tps:.2f} tok/s is {ratio*100:.0f}% of the "
                 f"{best.tps:.2f} tok/s roofline. There is essentially nothing "
