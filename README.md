@@ -512,6 +512,19 @@ result in an issue are the most useful thing you can send.
 | a GGUF on disk | `wirl recommend <hf-repo>` will tell you which one to download |
 | a free GPU | `wirl auto` refuses to sweep next to other GPU work |
 
+## A worked example
+
+[`examples/`](examples/) holds the actual running configuration from the
+reference machine — the launcher, the systemd unit, and the probe scripts —
+annotated with the measurement behind every flag, so the reasoning survives
+being read six months later.
+
+It also includes `model-qa.py`, which checks the model still answers correctly,
+keeps reasoning out of the reply, and does not leak tool-call markup. **Run
+something like it after every config change.** A faster server that produces
+worse text is not an improvement, and throughput benchmarks cannot see the
+difference.
+
 ## Reference machine
 
 Every measured number here comes from one machine, and is labelled where it

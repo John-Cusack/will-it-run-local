@@ -1,0 +1,54 @@
+[Unit]
+Description=llama.cpp - DeepSeek-V4-Flash-0731 (DSpark speculative decoding)
+Documentation=file:/srv/llm/logs/bakeoff.md
+# The docker bridge must exist before we can bind its gateway address.
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# ABLITERATED MXFP4 + matched abliterated DSpark drafter.
+# ncmoe=43 threads=32 ctx=16384 n_max=2 host=172.18.0.1 port=30001 draft=abl
+# 172.18.0.1 is the llm-local bridge gateway: reachable from this host and from
+# containers on that bridge (Open WebUI at 172.18.0.2). NOT on eno1/LAN.
+#
+# Chosen by measurement, `wirl auto`, 2026-09-09 (docs/reference-sweep-moe.log
+# in github.com/John-Cusack/will-it-run-local). 3 reps per config:
+#   n_max=1  10.01 tok/s      n_max=2  10.43 tok/s      n_max=3  9.80 tok/s
+# Cross-launch repeatability on an identical config was 1.8% (9.90/10.01/10.08),
+# so the +4.2% for n_max=2 is outside noise. Deeper loses: on top-6-of-256
+# routing each extra draft token hits mostly different experts, so expert reads
+# barely amortise.
+#
+# ncmoe=43 over 42: measured 9.90 vs 9.89 tok/s -- identical within noise -- but
+# 20.7 GB VRAM instead of 24.0 GB. The headroom is free.
+#
+# --cache-ram 8192 = llama.cpp's default, kept deliberately after an A/B.
+# It is the host-RAM store for completed prompt caches, so switching between
+# conversations does not re-prefill: an identical 6490-token prompt reprocesses
+# 4 tokens in 0.3 s instead of 6490 in 96 s, and that already works at 8 GiB
+# (~6 full 16K conversations at this model's 86 KB/token).
+# Raising it to 24576 measured SLOWER: 9.79 vs 10.25 tok/s over 6 runs each
+# (-4.5%, consistent in direction across two tests). Cause not established.
+# Only raise it if you actually keep more than ~6 chats warm, and re-measure.
+#
+# --cache-reuse is deliberately absent: this context cannot KV-shift
+# (sliding-window attention) and llama.cpp logs "cache_reuse is not supported
+# by this context, it will be disabled" and ignores the flag.
+# VRAM boundary was found empirically: ncmoe=41 does not start at all.
+ExecStart=/home/john/llamacpp-abl.sh 43 32 16384 2 172.18.0.1 30001 abl 8192
+
+# If docker starts late the bind fails; just keep retrying.
+Restart=on-failure
+RestartSec=15
+
+# Model load is ~15s warm, but can be minutes if the page cache is cold.
+TimeoutStartSec=900
+TimeoutStopSec=120
+
+# Be a good neighbour to the desktop.
+Nice=-5
+OOMScoreAdjust=-500
+
+[Install]
+WantedBy=default.target
