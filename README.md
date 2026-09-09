@@ -500,9 +500,34 @@ mixture-of-experts and dense models, with or without speculative decoding.
 Apple Silicon, Windows, fine-tuning, and wiring up a chat UI. Trying to cover
 every runtime is how tools like this die.
 
-**Tested on:** one machine (EPYC 7B12 + RTX 3090, Linux 7.0). Everything else is
-untested — if you run it somewhere different, the `probe` output and a `tune`
-result in an issue are the most useful thing you can send.
+**Tested on:** one machine (EPYC 7B12 + RTX 3090, Linux 7.0), against one MoE
+model and one dense model. Everything else is untested — if you run it
+somewhere different, the `probe` output and a `tune` result in an issue are the
+most useful thing you can send.
+
+### Known limitations
+
+Stated plainly, because a tool about honest measurement should be honest about
+itself:
+
+- **The calibration constants come from one machine**, and that machine has a
+  dead memory channel. `DEFAULT_EFFICIENCY`, `CPU_ONLY_DERATE` and
+  `CUDA_OVERHEAD` in `predict.py` are fitted to it. The *measured* paths do not
+  depend on them; the estimates do.
+- **The cost model under-predicts MoE throughput**, sometimes by 2x, because it
+  charges every routed expert to DRAM on every token and ignores cache reuse.
+  `wirl auto` detects and reports this rather than pretending otherwise, but
+  the roofline is a floor for MoE, not a ceiling.
+- **Nothing is calibrated for the GPU-bound regime.** Once a model fits in VRAM,
+  per-token cost is kernel launch and attention, not bandwidth. The tool says
+  "fast" and declines to give a number rather than quoting a roofline that is
+  several times optimistic.
+- **`wirl recommend` has not been validated end-to-end** — its predictions come
+  from remote headers and have never been checked against downloading the
+  recommended file and measuring it.
+- **Single GPU only.** With several present it uses index 0 unless told
+  otherwise; multi-GPU splits are not modelled at all.
+- **CI is configured but has not yet run** on GitHub, only locally.
 
 ### What you need before this is any use
 

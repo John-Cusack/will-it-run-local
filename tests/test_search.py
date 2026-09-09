@@ -225,3 +225,34 @@ def test_fast_first_token_is_not_nagged_about():
     out = search.summarise_depth(
         [_dp(23, 17, 10.1, 1.4), _dp(512, 200, 10.2, 2.6)], 16384)
     assert "seconds to the first token" not in out
+
+
+# --- machines with no GPU at all --------------------------------------------
+
+def _no_gpu(monkeypatch):
+    """nvidia-smi ignores CUDA_VISIBLE_DEVICES, so the only honest way to test
+    the no-GPU path is to remove the GPU at the source."""
+    from wirl import probe
+    monkeypatch.setattr(probe, "gpu_info", lambda: [])
+    monkeypatch.setattr(probe, "gpu_processes", lambda: [])
+
+
+def test_auto_refuses_without_a_gpu_and_says_why(monkeypatch, capsys):
+    from wirl import cli
+    _no_gpu(monkeypatch)
+    import pytest as _pytest
+    with _pytest.raises(SystemExit) as e:
+        cli.main(["auto", "/nonexistent-but-never-read.gguf", "--mem-bandwidth", "20"])
+    # It must fail on something explicable, not a traceback.
+    assert e.value.code != 0
+
+
+def test_plan_falls_back_to_a_cpu_only_estimate(monkeypatch, capsys, moe_model):
+    from wirl import cli
+    _no_gpu(monkeypatch)
+    cli.main(["plan", moe_model, "--mem-bandwidth", "20"])
+    out = capsys.readouterr().out
+    assert "none -- CPU only" in out
+    assert "CPU only:" in out
+    # and it must not pretend the estimate is trustworthy
+    assert "well below this" in out
