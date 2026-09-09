@@ -96,3 +96,25 @@ def test_llama_server_found_is_reported(monkeypatch):
     c = doctor.check_llama_server()
     assert c.status in (doctor.OK, doctor.WARN)
     assert "/bin/true" in c.detail
+
+
+def test_silently_disabled_cache_reuse_is_surfaced(tmp_path):
+    """llama.cpp disables --cache-reuse without an error on models whose
+    context cannot KV-shift. Set it, never read the log, and you will believe
+    it is working."""
+    log = tmp_path / "srv.log"
+    log.write_text("W srv load_model: cache_reuse is not supported by this "
+                   "context, it will be disabled\n")
+    c = doctor.check_prompt_cache(str(log))
+    assert c.status == doctor.WARN
+    assert "--cache-ram" in c.fix
+
+
+def test_clean_server_log_passes(tmp_path):
+    log = tmp_path / "srv.log"
+    log.write_text("srv load_model: loaded\n")
+    assert doctor.check_prompt_cache(str(log)).status == doctor.OK
+
+
+def test_no_log_is_not_an_error():
+    assert doctor.check_prompt_cache(None).status == doctor.OK

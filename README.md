@@ -316,11 +316,41 @@ even especially long. Prefill plateaus around 63 tok/s because a 512-token
 batch routes to essentially every one of the 256 experts, so each batch re-reads
 the whole expert set.
 
-Nothing else I measured mattered as much as this, and no benchmark I ran before
-building `wirl auto` measured it at all — every figure in this section below was
-taken with a ~20-token prompt. If you take one thing from this repo, take that
-you should measure prefill at a realistic prompt length, and look at
-`--cache-reuse` or a client that reuses the prefix before you tune anything else.
+**But that is the cold number, and it is easy to mislead yourself with it.**
+Those probes send a fresh prompt every time. llama.cpp caches prompts by
+default, so a real chat pays it only once. Measured on a conversation that grows
+the way a chat client actually sends one:
+
+| turn | tokens prefilled | prefill |
+|---|---|---|
+| 1 (long paste) | 5,195 | 79.2 s |
+| 2 | 37 | 4.1 s |
+| 3 | 10 | 0.7 s |
+| 4 | 10 | 0.7 s |
+
+I originally reported the 120 s as the headline daily-use problem. It is not —
+that reading came from my own benchmark passing `cache_prompt: false`. What
+actually still costs full price is narrower: **the first long prompt**, and
+**editing near the start of a conversation**, which diverges the prefix and
+forces a full reprocess (3,900 tokens / 59 s in one test).
+
+Two flags matter here, and they are not interchangeable:
+
+- **`--cache-ram`** (default 8192 MiB) holds finished prompt caches in host RAM
+  so switching between conversations does not re-prefill. The default already
+  covers ~6 full 16K conversations on the reference model. Raising it to 24 GiB
+  measured **slower** — 9.79 vs 10.25 tok/s over 6 runs each, −4.5%, consistent
+  in direction across two tests, cause not established. So: only raise it if you
+  actually keep more chats than the default holds, and A/B it when you do.
+- **`--cache-reuse`** salvages a diverged prefix by KV-shifting. It is
+  **silently disabled** on any model whose context cannot shift — sliding-window
+  attention, for one. On the reference model llama.cpp logged
+  `cache_reuse is not supported by this context, it will be disabled` and
+  carried on. `wirl doctor --server-log` checks for exactly that.
+
+The general lesson stands even though my first conclusion did not: measure
+prefill at a realistic prompt length **and with caching behaving as your client
+will**, or you will fix a problem you do not have.
 
 ### Thread count is a null result
 

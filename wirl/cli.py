@@ -665,7 +665,8 @@ def cmd_doctor(args):
     checks = doctor.run_all(model_bytes or None, gpu_bytes,
                             cache_type_k=args.cache_type_k,
                             path=os.path.dirname(args.model) if args.model else ".",
-                            llama_server=args.llama_server)
+                            llama_server=args.llama_server,
+                            server_log=args.server_log)
     report.print_checks(checks)
     fails = [c_ for c_ in checks if c_.status == "fail"]
     warns = [c_ for c_ in checks if c_.status == "warn"]
@@ -950,6 +951,8 @@ def build_parser():
     sp = sub.add_parser("doctor", help="check for conditions that silently ruin results")
     sp.add_argument("--model")
     sp.add_argument("--llama-server")
+    sp.add_argument("--server-log",
+                    help="llama-server log to scan for silently disabled flags")
     sp.add_argument("--cache-type-k", default="f16")
     sp.set_defaults(func=cmd_doctor)
 

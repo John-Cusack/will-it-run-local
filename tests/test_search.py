@@ -217,7 +217,8 @@ def test_slow_first_token_is_called_out():
     out = search.summarise_depth(
         [_dp(23, 17, 10.15, 1.4), _dp(7509, 63, 10.83, 119.7)], 16384)
     assert "120 seconds to the first token" in out
-    assert "cache-reuse" in out
+    assert "COLD case" in out
+    assert "cache-ram" in out
 
 
 def test_fast_first_token_is_not_nagged_about():

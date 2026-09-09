@@ -257,8 +257,36 @@ def check_llama_server(explicit=None) -> Check:
     return Check("llama.cpp", OK, detail + ", CUDA support detected.")
 
 
+def check_prompt_cache(server_log=None) -> Check:
+    """Prompt caching is the difference between a usable chat and a slow one.
+
+    It is on by default, so this mostly exists to surface the one silent
+    failure: `--cache-reuse` is disabled without error on any model whose
+    context cannot KV-shift (sliding-window attention, some latent-cache
+    designs). If you set it and never read the log, you will believe it is
+    working.
+    """
+    if not server_log or not os.path.exists(server_log):
+        return Check("prompt-cache", OK,
+                     "prompt caching is on by default (--cache-prompt).",
+                     "")
+    try:
+        with open(server_log, errors="replace") as f:
+            blob = f.read()
+    except OSError:
+        return Check("prompt-cache", OK, "could not read server log.")
+    if "cache_reuse is not supported by this context" in blob:
+        return Check("prompt-cache", WARN,
+                     "--cache-reuse was requested but llama.cpp disabled it.",
+                     "This context cannot KV-shift, so the flag does nothing. "
+                     "Plain prefix caching still works. To keep several "
+                     "conversations warm, raise --cache-ram (default 8192 MiB) "
+                     "instead.")
+    return Check("prompt-cache", OK, "no prompt-cache warnings in the server log.")
+
+
 def run_all(model_bytes=None, gpu_bytes=0, cache_type_k="f16", path=".",
-            llama_server=None) -> list:
+            llama_server=None, server_log=None) -> list:
     from .lock import foreign_gpu_users
     from .probe import cpu_info, gpu_info, mem_info
 
@@ -273,6 +301,7 @@ def run_all(model_bytes=None, gpu_bytes=0, cache_type_k="f16", path=".",
         check_thp(),
         check_stale_autotune(),
         check_k_cache_quant(cache_type_k, cpu),
+        check_prompt_cache(server_log),
     ]
     if model_bytes:
         checks.append(check_ram_for_model(mem, model_bytes, gpu_bytes))

@@ -239,8 +239,22 @@ def summarise_depth(points, ctx):
     if deepest.ttft_s > 20:
         rows.append("")
         rows.append(f"**{deepest.ttft_s:.0f} seconds to the first token** at "
-                    f"{deepest.prompt_n} tokens of history. On a long "
-                    "conversation this, not decode speed, is what you will "
-                    "actually feel. Prompt caching (`--cache-reuse`, or a client "
-                    "that reuses the prefix) is the lever that matters here.")
+                    f"{deepest.prompt_n} tokens of history -- but this is the "
+                    "COLD case: these probes send a fresh prompt every time.")
+        rows.append("")
+        rows.append("llama.cpp caches prompts by default, so a real chat pays "
+                    "this only on the first long message. Measured on the "
+                    "reference machine, a growing conversation prefilled 5195 "
+                    "tokens (79 s) on turn one and then 37, 10, 10 tokens "
+                    "(<5 s) on turns two to four. Two things still cost full "
+                    "price: the first long prompt, and editing near the START "
+                    "of a conversation, which diverges the prefix.")
+        rows.append("")
+        rows.append("If you switch between conversations, raise `--cache-ram` "
+                    "(default 8192 MiB) -- llama.cpp keeps finished prompt "
+                    "caches in host RAM and swaps them back in. `--cache-reuse` "
+                    "is a different thing and is silently disabled on models "
+                    "whose context cannot KV-shift, such as sliding-window "
+                    "attention; check the server log for 'cache_reuse is not "
+                    "supported by this context'.")
     return "\n".join(rows)
