@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "will-it-run-local"
+version = "0.1.0"
+description = "Predict and tune local LLM inference from measured hardware limits, not nameplate specs."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "John Cusack" }]
+keywords = ["llama.cpp", "gguf", "llm", "inference", "benchmark", "moe"]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+# No runtime dependencies on purpose: this tool runs on machines that are
+# already short on memory, and it should never be the reason an environment
+# breaks. numpy is used only as a fallback if no C compiler is present.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+wirl = "wirl.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/John-Cusack/will-it-run-local"
+Issues = "https://github.com/John-Cusack/will-it-run-local/issues"
+
+[tool.setuptools]
+packages = ["wirl"]
+
+[tool.setuptools.package-data]
+wirl = ["csrc/*.c"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

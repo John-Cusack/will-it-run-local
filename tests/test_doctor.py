@@ -1,0 +1,81 @@
+"""Pre-flight checks. Each corresponds to a specific silent failure."""
+from wirl import doctor
+
+GiB = 1 << 30
+
+
+def _mem(**over):
+    m = {"total": 216 * GiB, "available": 200 * GiB, "swap_total": 8 * GiB,
+         "swap_free": 8 * GiB, "swap_used": 0, "edac_total": 0}
+    m.update(over)
+    return m
+
+
+def test_heavy_swap_use_is_blocking():
+    c = doctor.check_swap(_mem(swap_used=6 * GiB))
+    assert c.status == doctor.FAIL
+
+
+def test_no_swap_use_is_ok():
+    assert doctor.check_swap(_mem()).status == doctor.OK
+
+
+def test_missing_dimm_is_detected():
+    """EDAC sees 256 GiB installed, the kernel sees 216: one DIMM is dark.
+
+    This is the check that found a dead memory channel on the reference
+    machine after it had cost hours of misattributed benchmarking.
+    """
+    c = doctor.check_dimm_population(_mem(edac_total=256 * GiB, total=216 * GiB))
+    assert c.status == doctor.WARN
+    assert "40 GiB gap" in c.detail
+
+
+def test_normal_kernel_reservation_is_not_flagged():
+    c = doctor.check_dimm_population(_mem(edac_total=256 * GiB, total=254 * GiB))
+    assert c.status == doctor.OK
+
+
+def test_no_edac_data_is_not_an_error():
+    assert doctor.check_dimm_population(_mem()).status == doctor.OK
+
+
+def test_busy_gpu_is_blocking():
+    gpus = [{"name": "RTX 3090", "vram_total": 24 * GiB, "vram_free": 2 * GiB,
+             "driver": "595.84"}]
+    busy = [{"pid": 1, "name": "llama-server", "vram_mb": 21090}]
+    assert doctor.check_gpu_free(gpus, busy).status == doctor.FAIL
+    assert doctor.check_gpu_free(gpus, []).status == doctor.OK
+
+
+def test_quantised_k_cache_is_flagged():
+    """--cache-type-k q8_0 produced corrupt output on the reference machine
+    (llama.cpp #25382) while the server appeared entirely healthy."""
+    cpu = {"isa": {}, "model": "x"}
+    assert doctor.check_k_cache_quant("q8_0", cpu).status == doctor.WARN
+    assert doctor.check_k_cache_quant("f16", cpu).status == doctor.OK
+
+
+def test_missing_avx2_is_blocking():
+    cpu = {"model": "old", "isa": {"avx2": False, "fma": False, "avx512f": False,
+                                   "avx512_bf16": False, "amx_int8": False}}
+    assert doctor.check_isa(cpu).status == doctor.FAIL
+
+
+def test_zen2_without_avx512_is_fine():
+    cpu = {"model": "EPYC 7B12", "isa": {"avx2": True, "fma": True,
+                                         "avx512f": False, "avx512_bf16": False,
+                                         "amx_int8": False}}
+    c = doctor.check_isa(cpu)
+    assert c.status == doctor.OK
+    assert "No AVX-512" in c.detail
+
+
+def test_model_larger_than_ram_is_blocking():
+    c = doctor.check_ram_for_model(_mem(available=100 * GiB), 156 * GiB, 0)
+    assert c.status == doctor.FAIL
+
+
+def test_offloading_to_gpu_can_make_it_fit():
+    c = doctor.check_ram_for_model(_mem(available=100 * GiB), 156 * GiB, 80 * GiB)
+    assert c.status == doctor.OK
