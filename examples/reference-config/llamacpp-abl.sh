@@ -13,7 +13,7 @@ HOST=${5:-172.18.0.1}; PORT=${6:-30001}; DRAFTSEL=${7:-abl}
 # at this model's 86 KB/token). --cache-reuse is deliberately NOT used: this
 # context cannot KV-shift (sliding-window attention), and llama.cpp disables
 # the flag with "cache_reuse is not supported by this context".
-CACHERAM=${8:-24576}
+CACHERAM=${8:-8192}
 
 BIN=/home/john/llama.cpp/build/bin/llama-server
 MODEL=/srv/llm/models/gguf/abliterated/DeepSeek-V4-Flash-Q4-mxfp4-0731.gguf
@@ -43,6 +43,13 @@ args=(
   --no-warmup
 )
 args+=( --cache-ram "$CACHERAM" )
+
+# API key, if one exists. Read from a 0600 file rather than the unit file or a
+# command line, both of which are readable by any local user via /proc.
+KEYFILE=/home/john/.config/llamacpp/api-key
+if [ -s "$KEYFILE" ]; then
+  args+=( --api-key-file "$KEYFILE" )
+fi
 case "$DRAFTSEL" in
   abl)  [ -f "$DRAFT_ABL" ] || { echo "FATAL: abl drafter missing" >&2; exit 1; }
         args+=( --spec-draft-model "$DRAFT_ABL" --spec-draft-ngl 99 --spec-draft-n-max "$NMAX" ) ;;

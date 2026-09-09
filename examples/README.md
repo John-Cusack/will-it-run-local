@@ -34,10 +34,32 @@ systemctl --user enable --now llamacpp
 sudo loginctl enable-linger "$USER"
 ```
 
-Note the unit binds `172.18.0.1`, a Docker bridge gateway, so a container
-(Open WebUI) can reach it while the LAN cannot. Change that to `127.0.0.1`
-unless you have the same arrangement — and check with `ip route get` before
-assuming any address is unreachable from outside.
+### The bind address is the security decision
+
+The unit binds this host's **Tailscale** address (`100.66.109.44`), not
+`0.0.0.0`. llama.cpp takes a single `--host`, and `0.0.0.0` would also listen on
+the LAN interface. Binding the tailscale0 address instead means the API is
+reachable from tailnet devices and from containers on the Docker bridge (which
+route to it through the host), while the LAN gets nothing:
+
+```
+192.168.0.135:30001 -> refused      # LAN
+172.18.0.1:30001    -> refused      # docker bridge
+127.0.0.1:30001     -> refused      # loopback
+100.66.109.44:30001 -> 200          # tailnet only
+```
+
+Change the address to `127.0.0.1` unless you have the same arrangement, and
+verify with `ss -tlnp` and a curl against each interface rather than assuming.
+
+**Tailscale Funnel is deliberately not used** — that publishes a service to the
+public internet. This is tailnet-only.
+
+### Authentication
+
+`--api-key-file` points at a `0600` file rather than putting the key on the
+command line or in the unit, both of which any local user can read via `/proc`
+or `systemctl cat`. Without a key the server returns `401`.
 
 ## `probes/`
 

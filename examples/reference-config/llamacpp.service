@@ -2,15 +2,19 @@
 Description=llama.cpp - DeepSeek-V4-Flash-0731 (DSpark speculative decoding)
 Documentation=file:/srv/llm/logs/bakeoff.md
 # The docker bridge must exist before we can bind its gateway address.
-After=network-online.target docker.service
+After=network-online.target docker.service tailscaled.service
 Wants=network-online.target
 
 [Service]
 Type=simple
 # ABLITERATED MXFP4 + matched abliterated DSpark drafter.
 # ncmoe=43 threads=32 ctx=16384 n_max=2 host=172.18.0.1 port=30001 draft=abl
-# 172.18.0.1 is the llm-local bridge gateway: reachable from this host and from
-# containers on that bridge (Open WebUI at 172.18.0.2). NOT on eno1/LAN.
+# Binds 100.66.109.44, this host's tailscale0 address, so the API is reachable
+# from other devices on the tailnet and from the Open WebUI container (which
+# routes to it via the bridge gateway). Deliberately NOT 0.0.0.0: that would
+# also listen on eno1/192.168.0.135, i.e. the LAN. Deliberately NOT exposed by
+# Tailscale Funnel, which would put it on the public internet.
+# Requests need an API key; see --api-key-file in llamacpp-abl.sh.
 #
 # Chosen by measurement, `wirl auto`, 2026-09-09 (docs/reference-sweep-moe.log
 # in github.com/John-Cusack/will-it-run-local). 3 reps per config:
@@ -36,7 +40,7 @@ Type=simple
 # (sliding-window attention) and llama.cpp logs "cache_reuse is not supported
 # by this context, it will be disabled" and ignores the flag.
 # VRAM boundary was found empirically: ncmoe=41 does not start at all.
-ExecStart=/home/john/llamacpp-abl.sh 43 32 16384 2 172.18.0.1 30001 abl 8192
+ExecStart=/home/john/llamacpp-abl.sh 43 32 16384 2 100.66.109.44 30001 abl 8192
 
 # If docker starts late the bind fails; just keep retrying.
 Restart=on-failure
