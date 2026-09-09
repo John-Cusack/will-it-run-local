@@ -162,11 +162,24 @@ def kv_cache_bytes(g, ctx: int, k_type: str = "f16", v_type: str = "f16") -> int
     vb = bpe.get(v_type, 2)
     n_layer = g.n_layer or 0
 
+    # Some architectures compress the KV cache per layer. DeepSeek-V4-Flash
+    # publishes attention.compress_ratios: one entry per layer, where N means
+    # that layer keeps roughly 1/N of the tokens (0 = keep everything). On the
+    # reference model 20 of 44 layers keep 1/128 and 21 keep 1/4, so the real
+    # cache is ~19% of what the naive per-layer arithmetic predicts -- about
+    # 16 KiB/token instead of 86. Ignoring this over-estimates KV by 5x and
+    # makes long contexts look unaffordable when they are nearly free.
+    ratios = g.a("attention.compress_ratios")
+    layer_scale = 1.0
+    if isinstance(ratios, list) and ratios:
+        eff = sum(1.0 if r in (0, 1) else 1.0 / r for r in ratios)
+        layer_scale = eff / len(ratios)
+
     lora = g.a("attention.kv_lora_rank")
     if lora:
         rope = g.a("rope.dimension_count") or g.a("attention.key_length_mla") or 64
         # MLA caches one compressed latent vector per token per layer.
-        return int(n_layer * ctx * (lora + rope) * kb)
+        return int(n_layer * ctx * (lora + rope) * kb * layer_scale)
 
     n_head_kv = g.a("attention.head_count_kv") or g.a("attention.head_count") or 0
     if isinstance(n_head_kv, list):
@@ -177,4 +190,4 @@ def kv_cache_bytes(g, ctx: int, k_type: str = "f16", v_type: str = "f16") -> int
     n_embd = g.n_embd or 0
     k_len = g.a("attention.key_length") or (n_embd // n_head if n_head else 0)
     v_len = g.a("attention.value_length") or k_len
-    return int(n_layer * ctx * n_head_kv * (k_len * kb + v_len * vb))
+    return int(n_layer * ctx * n_head_kv * (k_len * kb + v_len * vb) * layer_scale)

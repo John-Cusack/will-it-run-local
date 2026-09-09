@@ -108,3 +108,45 @@ def test_dense_vram_grows_with_offloaded_layers(tmp_path):
     assert vram == sorted(vram)
     assert vram[0] == 0
     assert mc.kv_fraction_on_gpu(2) == 0.5
+
+
+def test_per_layer_kv_compression_is_honoured(tmp_path):
+    """Some architectures keep only a fraction of tokens in most layers.
+
+    DeepSeek-V4-Flash publishes attention.compress_ratios; on the reference
+    model 20 of 44 layers keep 1/128 of tokens and 21 keep 1/4, so the real
+    cache is ~19% of the naive figure. Ignoring it over-estimates KV by 5x and
+    makes a context that is nearly free look unaffordable.
+    """
+    from tests.conftest import build_gguf
+    base = {"general.architecture": (8, "cmp"), "cmp.block_count": (4, 4),
+            "cmp.embedding_length": (4, 8),
+            "cmp.attention.head_count": (4, 2),
+            "cmp.attention.head_count_kv": (4, 1),
+            "cmp.attention.key_length": (4, 4),
+            "cmp.attention.value_length": (4, 4)}
+    plain = gguf.read(build_gguf(tmp_path / "plain.gguf", base, []))
+
+    # every layer keeps 1/4 -> a quarter of the cache
+    kv = dict(base)
+    kv["cmp.attention.compress_ratios"] = (9, (4, [4, 4, 4, 4]))
+    quartered = gguf.read(build_gguf(tmp_path / "q.gguf", kv, []))
+
+    full = model.kv_cache_bytes(plain, 4096)
+    small = model.kv_cache_bytes(quartered, 4096)
+    assert small == pytest.approx(full / 4, rel=0.01)
+
+
+def test_compress_ratio_zero_means_uncompressed(tmp_path):
+    from tests.conftest import build_gguf
+    base = {"general.architecture": (8, "cmp"), "cmp.block_count": (4, 2),
+            "cmp.embedding_length": (4, 8),
+            "cmp.attention.head_count": (4, 2),
+            "cmp.attention.head_count_kv": (4, 1),
+            "cmp.attention.key_length": (4, 4),
+            "cmp.attention.value_length": (4, 4)}
+    plain = gguf.read(build_gguf(tmp_path / "p2.gguf", base, []))
+    kv = dict(base)
+    kv["cmp.attention.compress_ratios"] = (9, (4, [0, 0]))
+    zeros = gguf.read(build_gguf(tmp_path / "z.gguf", kv, []))
+    assert model.kv_cache_bytes(zeros, 2048) == model.kv_cache_bytes(plain, 2048)
