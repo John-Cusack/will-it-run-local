@@ -123,17 +123,34 @@ def gpu_used_bytes(index=0) -> int:
 
 
 def _wait_health(host, port, proc, timeout):
+    """Wait until the server can actually generate, not merely until it binds.
+
+    /health returns 200 while the model is still loading, and a completion
+    request at that point comes back as
+    `{"error": {"message": "Loading model", "code": 503}}`. Trusting /health
+    alone reports a server ready seconds after launch and makes every timing
+    that follows wrong -- and, worse, makes a slow-loading configuration look
+    like a fast one. So the readiness check is a real generation.
+    """
     url = f"http://{host}:{port}/health"
     t0 = time.monotonic()
+    bound = False
     while time.monotonic() - t0 < timeout:
         if proc.poll() is not None:
             return None
-        try:
-            with urllib.request.urlopen(url, timeout=5) as r:
-                if r.status == 200:
+        if not bound:
+            try:
+                with urllib.request.urlopen(url, timeout=5) as r:
+                    bound = r.status == 200
+            except (urllib.error.URLError, OSError):
+                pass
+        if bound:
+            try:
+                tps, _, _ = _generate(host, port, 1, timeout=60)
+                if tps is not None:
                     return time.monotonic() - t0
-        except (urllib.error.URLError, OSError):
-            pass
+            except Exception:                                # noqa: BLE001
+                pass                                         # still loading
         time.sleep(2.0)
     return None
 

@@ -38,9 +38,20 @@ Type=simple
 # ceiling is generous rather than useful -- it exists so a large paste or a
 # coding agent's 16800-token system prompt never hits a hard wall.
 #
-# Verified end-to-end at 98304: starts, and processed a 22048-token prompt.
-# 131072 and above were not verified -- they behaved inconsistently in a quick
-# test and are not recommended without a proper run.
+# Verified end-to-end at 131072: loads in 15 s, reports n_ctx=131072, and
+# prefilled a 64491-token prompt in 938 s (68.7 tok/s) with zero allocation
+# failures, peaking at 22645 MiB.
+#
+# CAVEAT -- ctx-size is a ceiling, not a reservation. KV is allocated lazily at
+# a measured 20.4 KiB per token of REAL context, so VRAM depends on how full
+# the context actually gets:
+#     32768 tokens held -> 22.0 GB (90%)
+#     65536             -> 22.7 GB (92%)   <- verified
+#     98304             -> 23.3 GB (95%)
+#    131072             -> 24.0 GB (98%)   <- risky, same zone that failed before
+# Reaching 131072 needs ~32 minutes of prefill first, so in practice the risk
+# is remote. If you want a context that is safe even when completely full, use
+# 65536. "It starts" is NOT the same as "it fits".
 #
 # --cache-ram 8192 = llama.cpp's default, kept deliberately after an A/B.
 # It is the host-RAM store for completed prompt caches, so switching between
@@ -55,7 +66,7 @@ Type=simple
 # (sliding-window attention) and llama.cpp logs "cache_reuse is not supported
 # by this context, it will be disabled" and ignores the flag.
 # VRAM boundary was found empirically: ncmoe=41 does not start at all.
-ExecStart=/home/john/llamacpp-abl.sh 43 32 98304 2 100.66.109.44 30001 abl 8192
+ExecStart=/home/john/llamacpp-abl.sh 43 32 131072 2 100.66.109.44 30001 abl 8192
 
 # If docker starts late the bind fails; just keep retrying.
 Restart=on-failure

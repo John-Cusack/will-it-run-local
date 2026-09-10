@@ -528,6 +528,11 @@ itself:
 - **Single GPU only.** With several present it uses index 0 unless told
   otherwise; multi-GPU splits are not modelled at all.
 - **CI is configured but has not yet run** on GitHub, only locally.
+- **The VRAM edge is found by whether the server starts, which is not the same
+  as whether it fits.** llama.cpp allocates the KV cache lazily, so a context
+  size can load happily and then run out of VRAM once a conversation actually
+  fills it. On the reference model, `--ctx-size 131072` starts at 21.4 GB and
+  reaches 24.0 GB (98%) only when full. `wirl auto` measures the former.
 
 ### What you need before this is any use
 

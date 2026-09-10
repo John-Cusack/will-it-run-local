@@ -92,3 +92,37 @@ def test_repeatability_silent_when_nothing_repeats():
     a = RunConfig(model="/m", n_cpu_moe=42)
     b = RunConfig(model="/m", n_cpu_moe=43)
     assert tune.repeatability([_ok(a, 9.9), _ok(b, 10.0)]) == ""
+
+
+def test_readiness_requires_a_real_generation(monkeypatch):
+    """/health returns 200 while the model is still loading, and a completion
+    then fails with 503 "Loading model". Trusting /health alone declares a
+    server ready seconds after launch and invalidates every timing after it.
+    """
+    import wirl.runner as R
+
+    class FakeProc:
+        def poll(self):
+            return None
+
+    calls = {"n": 0}
+
+    class FakeResp:
+        status = 200
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(R.urllib.request, "urlopen", lambda *a, **k: FakeResp())
+    monkeypatch.setattr(R.time, "sleep", lambda s: None)
+
+    def gen(host, port, n, prompt=None, timeout=3600):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise RuntimeError("503 Loading model")
+        return 10.0, 50.0, 5
+
+    monkeypatch.setattr(R, "_generate", gen)
+    assert R._wait_health("h", 1, FakeProc(), timeout=60) is not None
+    assert calls["n"] == 3, "should have retried until generation succeeded"
