@@ -70,6 +70,16 @@ head-count values already normalise empty lists with `or`, and the impossible
 empty-parent check after `abspath`. Empty metadata and nested-file tests retain
 the same behaviour, without artificial fixtures for unreachable branches.
 
+### C4: server lifecycle, searches and sweeps
+
+**Status: complete.** Fifteen new isolated cases cover executable discovery,
+readiness retry/timeout/exit, prompt and completion payloads, log/teardown
+handling, failed/partial measurements, graceful and escalated cleanup, failed
+dense bisection, skipped/failed context requests, draft regressions, thread
+sweeps and instability reports. All three modules have 100% line and branch
+coverage; plain pytest passes 294 tests. No runtime changes or departures.
+Every subprocess and signal is fake, including the SIGTERM/SIGKILL cases.
+
 ## Decisions
 
 | decision | why |
