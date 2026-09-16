@@ -46,6 +46,15 @@ The suite passes 197 tests; overall coverage is 72.40% lines and 56.87% branches
 No runtime changes or departures. Added an opt-in fixture that rejects any
 unmocked process, network request or signal in these tests.
 
+### C2: hardware discovery, pre-flight, bandwidth and locks
+
+**Status: complete.** Forty-six new mocked cases cover kernel inventories,
+missing/invalid GPU queries, topology validation, server backend detection,
+cache/log inventories, bandwidth defaults/output/errors and fake numpy,
+permission/owner/flock failures and foreign-process filtering. All five modules
+have 100% line and branch coverage; plain pytest passes 243 tests. No runtime
+changes, predictor figure changes or departures. No real hardware measurements.
+
 ## Decisions
 
 | decision | why |
