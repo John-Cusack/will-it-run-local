@@ -255,3 +255,65 @@ def test_lock_creation_race_retries_plain_open(tmp_path, monkeypatch):
     with lock.benchmark_lock():
         pass
     assert flags == [os.O_RDWR, os.O_RDWR | os.O_CREAT | os.O_EXCL, os.O_RDWR]
+
+
+@pytest.mark.parametrize("fail_generation", [False, True])
+def test_vram_peak_samples_during_generation_and_stops(monkeypatch, fail_generation):
+    import threading
+    from contextlib import contextmanager
+    from wirl import runner
+    running, sampled = threading.Event(), threading.Event()
+    workers, calls = [], []
+
+    @contextmanager
+    def fake_server(*a, **kw):
+        yield 1.0
+        assert all(not worker.is_alive() for worker in workers)
+
+    def used(uuid=None):
+        calls.append(uuid)
+        if threading.current_thread() is not threading.main_thread():
+            workers.append(threading.current_thread())
+        if running.is_set():
+            sampled.set()
+            return 1000
+        return 10
+
+    def generate(*a):
+        running.set()
+        try:
+            assert sampled.wait(0.5), "no VRAM sample while generation was running"
+            if fail_generation:
+                raise RuntimeError("generation failed")
+            return 10.0, 20.0, 1
+        finally:
+            running.clear()
+
+    monkeypatch.setattr(runner, "server", fake_server)
+    monkeypatch.setattr(runner, "gpu_used_bytes", used)
+    monkeypatch.setattr(runner, "_generate", generate)
+    # Shorten only the sampling interval; Events keep the transient deterministic.
+    monkeypatch.setattr(runner, "VRAM_SAMPLE_INTERVAL", 0.001, raising=False)
+    result = runner.run_config(RunConfig("m", gpu_uuid="GPU-one"), "s", reps=1, verbose=False)
+    assert result.peak_vram == 1000
+    assert result.ok == (not fail_generation)
+    assert workers and all(not worker.is_alive() for worker in workers)
+    assert all(uuid == "GPU-one" for uuid in calls)
+
+
+def test_failed_vram_sampling_is_not_a_successful_measurement(monkeypatch):
+    from contextlib import contextmanager
+    from wirl import runner
+
+    @contextmanager
+    def fake_server(*a):
+        yield 1.0
+
+    def failed_sample(uuid):
+        raise OSError("telemetry unavailable")
+
+    monkeypatch.setattr(runner, "server", fake_server)
+    monkeypatch.setattr(runner, "_generate", lambda *a: (10.0, 20.0, 1))
+    monkeypatch.setattr(runner, "gpu_used_bytes", failed_sample)
+    result = runner.run_config(RunConfig("m"), "s", reps=1, verbose=False)
+    assert not result.ok and "VRAM sampling failed" in result.error

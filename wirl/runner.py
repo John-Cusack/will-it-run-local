@@ -18,6 +18,7 @@ import shutil
 import signal
 import statistics
 import subprocess
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -26,6 +27,8 @@ from dataclasses import dataclass, field
 
 BENCH_PROMPT = ("Write a detailed technical description of how a four-stroke "
                 "internal combustion engine works. Be thorough.")
+
+VRAM_SAMPLE_INTERVAL = 1.0
 
 
 @dataclass
@@ -245,17 +248,45 @@ def run_config(cfg: RunConfig, binary: str, reps=3, n_tokens=400,
                startup_timeout=1200, log_dir=None, verbose=True) -> RunResult:
     """Start a server, measure it `reps` times, stop it. Always cleans up."""
     samples, prefill, peak = [], [], 0
+    stop = threading.Event()
+    peak_lock = threading.Lock()
+    sampling_errors = []
+
+    def sample_vram():
+        nonlocal peak
+        try:
+            used = gpu_used_bytes(cfg.gpu_uuid)
+            with peak_lock:
+                peak = max(peak, used)
+        except Exception as e:                              # noqa: BLE001
+            sampling_errors.append(e)
+
+    def monitor_vram():
+        while not stop.is_set():
+            sample_vram()
+            stop.wait(VRAM_SAMPLE_INTERVAL)
+
     try:
         with server(cfg, binary, startup_timeout, log_dir, verbose) as started:
-            for i in range(reps):
-                tps, pre, _ = _generate(cfg.host, cfg.port, n_tokens)
-                if tps:
-                    samples.append(tps)
-                if pre:
-                    prefill.append(pre)
-                peak = max(peak, gpu_used_bytes(cfg.gpu_uuid))
-                if verbose:
-                    print(f"    rep{i}: {tps:.2f} tok/s", flush=True)
+            # Post-request readings miss temporary compute buffers, making the
+            # headroom comparison optimistic. Sample during generation as well.
+            sampler = threading.Thread(target=monitor_vram, name="wirl-vram", daemon=True)
+            sampler.start()
+            try:
+                for i in range(reps):
+                    tps, pre, _ = _generate(cfg.host, cfg.port, n_tokens)
+                    if tps:
+                        samples.append(tps)
+                    if pre:
+                        prefill.append(pre)
+                    sample_vram()
+                    if verbose:
+                        print(f"    rep{i}: {tps:.2f} tok/s", flush=True)
+            finally:
+                stop.set()
+                sampler.join()
+            if sampling_errors:
+                raise RuntimeError(f"VRAM sampling failed: {sampling_errors[0]}")
             return RunResult(cfg, samples, prefill, peak, started, True)
     except ServerFailed as e:
         return RunResult(cfg, [], [], 0, 0.0, False, str(e))

@@ -458,6 +458,16 @@ with extra bytes returns only `length`.
 
 ### 3.3 "Peak VRAM" is not a peak (needs 2.3)
 
+**Status: complete.** A background thread samples the selected UUID at a
+one-second interval during requests and retains the maximum, alongside
+post-request readings. The thread is stopped and joined before server teardown,
+including request failure. Two transient-spike/cleanup cases failed before the
+fix; a third covers telemetry errors. Plain `pytest -q`: 159 passed.
+
+**Refinement:** a sampling exception makes the run unsuccessful rather than
+presenting missing telemetry as spare headroom. This remains a sampled maximum;
+allocations shorter than the interval can still be missed.
+
 **Problem.** `run_config` samples `nvidia-smi` after each request finishes
 (`runner.py:252`), so "peak VRAM" is really the VRAM in use after generation.
 Anything allocated during a request and released before it ends is missed, and
