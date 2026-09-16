@@ -71,8 +71,7 @@ WantedBy={'default.target' if user_unit else 'multi-user.target'}
 
 def write(path, content, mode=0o644):
     d = os.path.dirname(os.path.abspath(path))
-    if d:
-        os.makedirs(d, exist_ok=True)
+    os.makedirs(d, exist_ok=True)
     with open(path, "w") as f:
         f.write(content)
     os.chmod(path, mode)

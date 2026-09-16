@@ -183,10 +183,10 @@ def kv_cache_bytes(g, ctx: int, k_type: str = "f16", v_type: str = "f16") -> int
 
     n_head_kv = g.a("attention.head_count_kv") or g.a("attention.head_count") or 0
     if isinstance(n_head_kv, list):
-        n_head_kv = max(n_head_kv) if n_head_kv else 0
+        n_head_kv = max(n_head_kv)
     n_head = g.a("attention.head_count") or 1
     if isinstance(n_head, list):
-        n_head = max(n_head) if n_head else 1
+        n_head = max(n_head)
     n_embd = g.n_embd or 0
     k_len = g.a("attention.key_length") or (n_embd // n_head if n_head else 0)
     v_len = g.a("attention.value_length") or k_len

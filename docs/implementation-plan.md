@@ -55,6 +55,21 @@ permission/owner/flock failures and foreign-process filtering. All five modules
 have 100% line and branch coverage; plain pytest passes 243 tests. No runtime
 changes, predictor figure changes or departures. No real hardware measurements.
 
+### C3: GGUF metadata, costs, predictions, recommendations and output
+
+**Status: complete.** Thirty-six new cases cover scalar/array metadata,
+remote buffer reuse/refetch/EOF, complete shard tables, tensor properties,
+missing/per-layer/MLA metadata, zero-bandwidth/no-fit predictions, candidate
+loading/failure/dense paths, colour/wrapping, generated files and entry-point
+help. These modules now have 100% line and branch coverage; plain pytest
+passes 279 tests. Published figures in `tests/test_predict.py` are unchanged.
+
+**Departures:** the long-word wrapping regression failed on the original code;
+fixed its extra blank first line. Removed redundant empty-list checks after
+head-count values already normalise empty lists with `or`, and the impossible
+empty-parent check after `abspath`. Empty metadata and nested-file tests retain
+the same behaviour, without artificial fixtures for unreachable branches.
+
 ## Decisions
 
 | decision | why |

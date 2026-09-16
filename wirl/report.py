@@ -51,7 +51,7 @@ def print_checks(checks, show_ok=True):
 def _wrap(text, width):
     words, line, out = text.split(), "", []
     for w in words:
-        if len(line) + len(w) + 1 > width:
+        if line and len(line) + len(w) + 1 > width:
             out.append(line)
             line = w
         else:
