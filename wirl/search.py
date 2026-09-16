@@ -83,12 +83,12 @@ def _bisect_edge(base, binary, lo, hi, apply, flag, prefer_low, log=None,
     return best_ok
 
 
-def _set_ncmoe(cfg, v):
+def set_ncmoe(cfg, v):
     cfg.n_cpu_moe = v
     cfg.n_gpu_layers = 99
 
 
-def _set_ngl(cfg, v):
+def set_ngl(cfg, v):
     cfg.n_cpu_moe = None          # meaningless on a dense model
     cfg.n_gpu_layers = v
 
@@ -96,7 +96,7 @@ def _set_ngl(cfg, v):
 def find_vram_edge(base: RunConfig, binary, lo, hi, log=None, log_dir=None,
                    verbose=True):
     """Smallest --n-cpu-moe that still starts (mixture-of-experts models)."""
-    return _bisect_edge(base, binary, lo, hi, _set_ncmoe, "--n-cpu-moe",
+    return _bisect_edge(base, binary, lo, hi, set_ncmoe, "--n-cpu-moe",
                         prefer_low=True, log=log, log_dir=log_dir,
                         verbose=verbose)
 
@@ -109,7 +109,7 @@ def find_ngl_edge(base: RunConfig, binary, lo, hi, log=None, log_dir=None,
     leave behind. Bisecting it would launch several identical servers and call
     the resulting noise a result.
     """
-    return _bisect_edge(base, binary, lo, hi, _set_ngl, "--n-gpu-layers",
+    return _bisect_edge(base, binary, lo, hi, set_ngl, "--n-gpu-layers",
                         prefer_low=False, log=log, log_dir=log_dir,
                         verbose=verbose)
 
@@ -126,10 +126,10 @@ def measure_around(base: RunConfig, binary, centre, span=2, reps=3, n_tokens=400
     results = []
     if moe:
         hi = centre + span if max_layer is None else min(centre + span, max_layer)
-        values, apply, flag = range(centre, hi + 1), _set_ncmoe, "--n-cpu-moe"
+        values, apply, flag = range(centre, hi + 1), set_ncmoe, "--n-cpu-moe"
     else:
         lo = max(0, centre - span)
-        values, apply, flag = range(centre, lo - 1, -1), _set_ngl, "--n-gpu-layers"
+        values, apply, flag = range(centre, lo - 1, -1), set_ngl, "--n-gpu-layers"
     for n in values:
         cfg = copy.copy(base)
         apply(cfg, n)

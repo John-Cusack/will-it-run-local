@@ -224,7 +224,7 @@ def cmd_plan(args):
             break
 
     head("Verdict")
-    for line in predict.verdict(mc, best, bw_cpu):
+    for line in predict.verdict(mc, best, bw_cpu, knob=knob):
         report.para(line)
         print()
     if best:
@@ -459,7 +459,7 @@ def cmd_auto(args):
              f"at {knob} {best_pred.n_cpu_moe}; measured is {delta:+.0f}% "
              "against that. The measured number is the one to trust.")
         print()
-    for line in predict.verdict(mc, best_pred, bw_cpu, measured_tps=winner.mean):
+    for line in predict.verdict(mc, best_pred, bw_cpu, measured_tps=winner.mean, knob=knob):
         report.para(line)
         print()
 
@@ -731,27 +731,33 @@ def cmd_tune(args):
 
     gpu, budget, bw_gpu = _gpu_choice(args)
     bw_cpu, _ = _bandwidth(args)
-    best, _ = predict.best_fit(mc, g, bw_cpu, bw_gpu, budget, args.ctx,
-                               headroom=args.headroom * 1e9,
-                               draft_mc=dmc, draft_g=dg)
+    moe = mc.is_moe
+    knob = "--n-cpu-moe" if moe else "--n-gpu-layers"
+    if moe:
+        best, _ = predict.best_fit(mc, g, bw_cpu, bw_gpu, budget, args.ctx,
+                                   headroom=args.headroom * 1e9,
+                                   draft_mc=dmc, draft_g=dg)
+    else:
+        best, _ = predict.best_fit_dense(mc, g, bw_cpu, bw_gpu, budget, args.ctx,
+                                         headroom=min(args.headroom * 1e9, 1e9))
     if best is None:
-        sys.exit("error: no configuration fits this GPU at this context length.")
+        sys.exit(f"error: no {knob} configuration fits this GPU at this context length.")
 
     start = best.n_cpu_moe
-    cands = [n for n in range(min(mc.n_layer, start + args.span),
-                              max(0, start - args.span) - 1, -1)]
+    lo, hi = max(0, start - args.span), min(mc.n_layer, start + args.span)
+    cands = list(range(hi, lo - 1, -1) if moe else range(lo, hi + 1))
 
     base = RunConfig(model=g.path, ctx=args.ctx, threads=args.threads,
                      draft_model=dg.path if dg else None,
                      draft_n_max=args.draft_n_max, port=args.port)
 
-    head("Measured sweep: --n-cpu-moe")
-    para(f"Prediction says {start}. Sweeping {cands[0]} down to {cands[-1]} to "
+    head(f"Measured sweep: {knob}")
+    para(f"Prediction says {start}. Sweeping {knob} {cands[0]} to {cands[-1]} to "
          "confirm, with " + str(args.reps) + " repetitions each.")
     print()
     try:
         with benchmark_lock(wait=args.wait):
-            results = tune.sweep_ncmoe(base, binary, cands, reps=args.reps,
+            results = tune.sweep_offload(base, binary, cands, moe, reps=args.reps,
                                        n_tokens=args.tokens, log_dir=args.log_dir)
             if args.draft and args.depth_sweep:
                 ok = [r for r in results if r.ok]
@@ -761,9 +767,7 @@ def cmd_tune(args):
                     para("Shallow first. On sparse MoE models deeper drafting "
                          "usually loses, so this stops as soon as it stops paying.")
                     print()
-                    import copy
-                    b2 = copy.copy(base)
-                    b2.n_cpu_moe = win.config.n_cpu_moe
+                    b2 = copy.copy(win.config)
                     results += tune.sweep_draft_depth(b2, binary, (1, 2, 3),
                                                       reps=args.reps,
                                                       n_tokens=args.tokens,
@@ -792,7 +796,7 @@ def cmd_tune(args):
     print(f"  {win.config.label()}  ->  {win.mean:.2f} tok/s, "
           f"{win.peak_vram / (1 << 20):.0f} MiB peak VRAM")
     print()
-    for line in predict.verdict(mc, best, bw_cpu, measured_tps=win.mean):
+    for line in predict.verdict(mc, best, bw_cpu, measured_tps=win.mean, knob=knob):
         report.para(line)
         print()
 

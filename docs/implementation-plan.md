@@ -143,6 +143,13 @@ The CLI needs no change: its table already prints `f"{knob} {knob_value}"` and
 
 ### 2.2 `wirl tune` treats dense models as mixture-of-experts
 
+**Status: complete.** Dense tuning predicts and sweeps ascending GPU-layer
+counts, MoE keeps descending expert counts, and draft depths copy the winner.
+Offload setters are public and verdicts name the selected knob. Six new cases
+cover both CLI paths, winner preservation, verdicts and first-failure stopping;
+five failed before the fix (the MoE control already passed).
+Plain `pytest -q`: 118 passed. Followed the plan; no existing tests changed.
+
 **Problem.** `cmd_tune` always predicts with `predict.best_fit`
 (`cli.py:734`) and sweeps `--n-cpu-moe` (`cli.py:741`, `:754`). On a dense
 model `--n-cpu-moe` does nothing: every value gives the same predicted split

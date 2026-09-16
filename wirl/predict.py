@@ -152,7 +152,7 @@ def cpu_only_tps(mc, bw_cpu, efficiency=DEFAULT_EFFICIENCY, derate=CPU_ONLY_DERA
     return (1.0 / seconds) * derate if seconds else 0.0
 
 
-def verdict(mc, best, bw_cpu, measured_tps=None):
+def verdict(mc, best, bw_cpu, measured_tps=None, knob="--n-cpu-moe"):
     """Say plainly whether tuning is worth the user's time.
 
     An honest 'stop, you are already at the wall' is more useful than another
@@ -161,7 +161,7 @@ def verdict(mc, best, bw_cpu, measured_tps=None):
     """
     lines = []
     if best is None:
-        lines.append("DOES NOT FIT: no --n-cpu-moe value fits this GPU at this "
+        lines.append(f"DOES NOT FIT: no {knob} value fits this GPU at this "
                      "context length. Reduce --ctx-size, drop the draft model, "
                      "or use a smaller quantisation.")
         return lines

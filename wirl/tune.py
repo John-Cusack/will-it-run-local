@@ -16,26 +16,27 @@ from __future__ import annotations
 import copy
 
 from .runner import RunConfig, RunResult, run_config
+from .search import set_ncmoe, set_ngl
 
 
-def sweep_ncmoe(base: RunConfig, binary, candidates, reps=3, n_tokens=400,
+def sweep_offload(base: RunConfig, binary, candidates, moe, reps=3, n_tokens=400,
                 log_dir=None) -> list:
-    """Walk --n-cpu-moe downward until it stops fitting.
+    """Walk towards more GPU offload until it stops fitting.
 
-    Lower means more expert layers on the GPU and less DRAM traffic, so
+    Descending --n-cpu-moe or ascending --n-gpu-layers puts more on the GPU, so
     throughput improves monotonically until allocation fails. The interesting
     part is not the peak but where the peak sits relative to the VRAM ceiling.
     """
     results = []
     for n in candidates:
         cfg = copy.copy(base)
-        cfg.n_cpu_moe = n
-        print(f"  ncmoe={n}", flush=True)
+        (set_ncmoe if moe else set_ngl)(cfg, n)
+        print(f"  {cfg.label()}", flush=True)
         r = run_config(cfg, binary, reps=reps, n_tokens=n_tokens, log_dir=log_dir)
         results.append(r)
         if not r.ok:
             print(f"    FAILED: {r.error}", flush=True)
-            # Failure here is almost always VRAM. Going lower will also fail.
+            # Both candidate orders increase VRAM; later values will also fail.
             break
     return results
 
