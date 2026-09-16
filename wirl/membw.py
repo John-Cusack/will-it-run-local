@@ -28,21 +28,34 @@ def cache_dir() -> str:
     return d
 
 
-def build_probe(force=False) -> str | None:
-    """Compile the probe. Returns the binary path, or None if no compiler."""
+def _build_probe(force=False) -> tuple:
+    """Return (binary, failure reason), keeping diagnostics with the result."""
+    if sys.platform != "linux":
+        return None, "will-it-run-local supports Linux only"
     out = os.path.join(cache_dir(), "membw")
     if os.path.exists(out) and not force:
         if os.path.getmtime(out) >= os.path.getmtime(CSRC):
-            return out
+            return out, None
     cc = os.environ.get("CC") or shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
     if not cc:
-        return None
+        return None, "no C compiler found (tried cc, gcc and clang)"
     cmd = [cc, "-O2", "-pthread", CSRC, "-o", out]
-    p = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True)
+    except OSError as e:
+        return None, f"bandwidth probe compile failed ({cc}): {e}"
     if p.returncode != 0:
-        print(f"warning: could not build bandwidth probe:\n{p.stderr}", file=sys.stderr)
-        return None
-    return out
+        detail = (p.stderr or p.stdout or f"exit {p.returncode}").strip()
+        return None, f"bandwidth probe compile failed ({cc}): {detail}"
+    return out, None
+
+
+def build_probe(force=False) -> str | None:
+    """Compile the probe, reporting why no binary could be produced."""
+    binary, reason = _build_probe(force)
+    if reason:
+        print(f"warning: {reason}", file=sys.stderr)
+    return binary
 
 
 @dataclass
@@ -102,12 +115,12 @@ def measure(mode="stream", threads=None, gib=None, reps=3, cores=None) -> BwResu
         avail_gib = mem_info()["available"] // (1 << 30)
         gib = max(2, min(32, int(avail_gib * 0.35)))
 
-    bin_path = build_probe()
+    bin_path, reason = _build_probe()
     if not bin_path:
         r = _numpy_stream(gib, reps)
         if r:
             return r
-        raise RuntimeError("no C compiler and no numpy: cannot measure bandwidth")
+        raise RuntimeError(f"{reason}; no numpy fallback: cannot measure bandwidth")
 
     cmd = [bin_path, mode, str(threads), str(gib), str(reps)]
     if cores:

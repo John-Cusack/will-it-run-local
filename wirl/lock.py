@@ -14,7 +14,6 @@ number obtained under contention is merely noisy.
 from __future__ import annotations
 
 import errno
-import fcntl
 import os
 import sys
 from contextlib import contextmanager
@@ -67,6 +66,7 @@ def _open_lock():
 
 @contextmanager
 def benchmark_lock(wait=False):
+    import fcntl
     fd = _open_lock()
     try:
         flags = fcntl.LOCK_EX if wait else (fcntl.LOCK_EX | fcntl.LOCK_NB)

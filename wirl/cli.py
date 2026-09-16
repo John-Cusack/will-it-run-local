@@ -1011,6 +1011,8 @@ def build_parser():
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
+    if sys.platform != "linux":
+        sys.exit("will-it-run-local supports Linux only")
     try:
         return args.func(args) or 0
     except KeyboardInterrupt:

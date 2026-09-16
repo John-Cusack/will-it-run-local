@@ -481,6 +481,21 @@ running: the spike is recorded.
 
 ### 3.4 Clear errors off Linux
 
+**Status: complete.** Defer `fcntl` until locking, reject non-Linux commands
+after argparse, and preserve compilation failure reasons in bandwidth errors.
+Six tests cover darwin rejection, help/version, import without fcntl, mocked
+`CC=/bin/false` diagnostics and missing compiler; four failed before the fix,
+while help/version controls already passed. Plain `pytest -q`: 165 passed.
+
+**Refinement:** a shared `_build_probe` returns path + reason; public
+`build_probe` keeps its existing path/None return for CI and reports the reason,
+while `measure` uses the same result directly without global error state.
+
+**Execution incident:** the first platform negative control lacked a mocked
+command dispatch and ran real stream/gather bandwidth probes. They completed;
+no llama-server was launched or service changed. Dispatch is now mocked, and
+all subsequent platform checks avoid hardware work.
+
 **Problem.** `lock.py:17` imports `fcntl` at module level, and `cli.py` imports
 `lock` at startup, so `wirl --help` crashes with `ModuleNotFoundError` on
 Windows. On macOS the probe fails to compile (`cpu_set_t` and
