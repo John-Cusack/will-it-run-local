@@ -151,6 +151,7 @@ def test_stop_already_exited_and_graceful_exit(monkeypatch):
     proc = SimpleNamespace(pid=42, poll=lambda: next(polls))
     monkeypatch.setattr(runner.os, "getpgid", lambda pid: pid)
     monkeypatch.setattr(runner.os, "killpg", lambda *a: calls.append(a))
+    monkeypatch.setattr(runner.time, "monotonic", lambda: 0)
     monkeypatch.setattr(runner.time, "sleep", lambda s: calls.append(s))
     runner._stop(proc, grace=10)
     assert calls == [(42, signal.SIGTERM), .5, 3]

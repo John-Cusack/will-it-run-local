@@ -1,5 +1,22 @@
 # Test coverage
 
+**Current status: 100% Python line and branch coverage.** On 2026-09-16 the
+completed coverage follow-up passes 353 tests and covers all 2354 statements
+and 726 branch outcomes across every module in `wirl`. No source files,
+statements or error paths are excluded. The small statement-count reduction
+comes from simplifying an unreachable empty-parent guard, rather than hiding
+code from coverage.
+Fresh editable-install venvs on Python 3.9.25 and 3.14.2 reproduce these exact
+totals and pass plain `pytest -q`. The extracted CI test/JSON gate also passes
+locally on 3.14.2. Python 3.12.3 passes the same suite and coverage totals.
+
+The follow-up adds 166 tests/cases covering the gaps below. The tests exposed
+and fixed an extra blank first line when wrapping a long word. Two redundant
+empty-list guards after head-count normalisation were also simplified. Existing
+tests and the published measurements in `tests/test_predict.py` are unchanged.
+
+## Historical measurements
+
 Measured on 2026-09-16 after Phases 1–3: 174 passing tests, **68.45% line
 coverage** (1610/2352 statements) and **53.03% branch coverage** (385/726).
 There are 742 unexecuted statements and 341 unexecuted branch outcomes. No
@@ -7,10 +24,12 @@ source files or error paths were excluded from this measurement.
 
 After Phase 4's mocked packaging/runtime tests: **187 tests pass**, with
 **69.00% line coverage** (1625/2355 statements) and **54.12% branch coverage**
-(394/728). Reaching 100% still requires covering **730 statements** and
-**334 branch outcomes**, chiefly in the same areas listed below. Both local
+(394/728). At that point, reaching 100% required covering **730 statements** and
+**334 branch outcomes**, chiefly in the areas listed below. Both historical
 measurements use Python 3.12.3; the latest totals also reproduce exactly on
 Python 3.14.2. CI collects JSON/HTML reports on Python 3.14.
+
+## Running checks
 
 Install the development extra and use the real pytest entry point from the
 repository root, matching CI:
@@ -25,12 +44,13 @@ The HTML report is written to `htmlcov/index.html`. These are Python execution
 metrics: the C probe and GitHub workflow shell steps require separate build and
 integration checks. Even 100% line and branch coverage cannot establish the
 accuracy of a bandwidth prediction on unmeasured hardware.
-CI uploads `coverage.json` and the HTML report as the `python-coverage` artifact
-without applying a threshold the suite does not yet meet. The combined coverage
-percentage also includes branches; use the separate statement/branch fields
-in JSON when assessing progress towards 100%.
+CI uploads `coverage.json` and the HTML report as the `python-coverage` artifact.
+Its Python 3.14 check applies `--cov-fail-under=100` and independently asserts
+zero missing statements, zero missing branch outcomes and zero excluded lines
+in JSON. The combined coverage percentage also includes branches; the separate
+statement/branch fields establish that both totals are exactly 100%.
 
-## Work required for 100%
+## Closed coverage gaps
 
 | area | missing statements in the baseline | scenarios to add |
 |---|---:|---|
@@ -48,13 +68,18 @@ in JSON when assessing progress towards 100%.
 | lock | 12 | permission/owner lookup failures, flock errors, ignored/small/malformed GPU process records |
 | model/predict/report/type table/entry point | 27 | degenerate metadata, no-fit/zero-bandwidth cases, coloured output/wrapped checks, unknown types and subprocess entry-point help |
 
-Add behavioural assertions for the missed paths, then rerun the report and
-close the remaining branch outcomes. Keep all published predictor figures
-unchanged. Use fake files and processes throughout; hardware commands, network
-requests, model loading and llama-server launches must be mocked, including in
-negative controls. Do not add exclusions or weaken assertions to obtain 100%.
+These gaps are now covered by behavioural assertions, using tiny synthetic
+headers, fake files, HTTP responses, arrays, clocks, processes and signals.
+The new tests use an opt-in `isolated_runtime` fixture that fails any omitted
+process/network/signal mock and disables real numpy allocations. Hardware
+commands, network requests, model loading and llama-server launches remain
+mocked, including in negative controls.
 
-Once all measured gaps are closed, add `--cov-fail-under=100` to a dedicated CI
-coverage check and explicitly verify both line and branch totals in the JSON
-report. The current suite does not meet that threshold; no false 100% gate has
-been enabled.
+## Still required outside Python coverage
+
+Phase 4's native ARM execution, reference-machine alternating prebuilt/source
+bandwidth comparison and compiler-free container measurements remain acceptance
+checks. The CI workflow implements the isolated-runner/container checks, but
+has not been pushed or run remotely. Local wheel installation and usage-path
+checks allocate no benchmark buffers. PyPI/GitHub setup, tags and publication
+are also pending under the earlier release restriction.

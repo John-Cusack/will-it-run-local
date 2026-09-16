@@ -32,7 +32,15 @@ jobs:
         # synthetic GGUFs and mocks every server launch.
         run: |
           if [ "${{ matrix.python-version }}" = "3.14" ]; then
-            pytest -q --cov=wirl --cov-branch --cov-report=term-missing --cov-report=json --cov-report=html
+            pytest -q --cov=wirl --cov-branch --cov-fail-under=100 --cov-report=term-missing --cov-report=json --cov-report=html
+            python - <<'PY'
+          import json
+          with open("coverage.json") as source:
+              totals = json.load(source)["totals"]
+          assert totals["missing_lines"] == 0, totals
+          assert totals["missing_branches"] == 0, totals
+          assert totals["excluded_lines"] == 0, totals
+          PY
           else
             pytest -q
           fi

@@ -19,22 +19,20 @@ operations, pushing and tagging remain in force. Implement and test the local
 packaging/release preparation, and leave the hardware acceptance measurements
 and external account setup explicitly pending.
 
-**Coverage status: measured, not 100%.** Phase 4 brings the suite to 187 passing
-tests. The Python package has 69.00% line and 54.12% branch coverage, leaving
-730 statements and 334 branch outcomes unexecuted (Python 3.12.3 measurement).
-Added development-only coverage tooling, CI JSON/HTML artifacts on 3.14 and a
-concrete gap inventory in `docs/test-coverage.md`. Full line/branch coverage is
-an outstanding workstream; no paths are excluded to inflate the result. The
-Phase 1–3 baseline is retained in that document for comparison.
-The latest totals also reproduce on Python 3.14.2. Both edited workflows pass
-actionlint 1.7.12 locally; their remote jobs remain pending until authorised
-pushing/CI execution.
+**Coverage status: complete for the Python package.** The follow-up adds 166
+tests/cases, bringing the suite to 353 passing tests. Every `wirl` module has
+100% line and branch coverage: 2354 statements and 726 branch outcomes, with
+zero missing or excluded lines. CI now requires 100% and independently checks
+the JSON statement/branch totals. Historical measurements are retained in
+`docs/test-coverage.md`. C kernels and workflow/hardware acceptance are separate.
+Both edited workflows pass actionlint 1.7.12 locally; remote jobs remain
+pending until authorised pushing/CI execution.
 
 ## Coverage follow-up
 
-**Status: in progress.** The user asked to continue the remaining work. Close
-the Python line and branch gaps with behavioural tests and retain all hardware,
-network and publication restrictions. Hardware acceptance is separate.
+**Status: complete for Python line and branch coverage.** Closed the measured
+gaps with behavioural assertions and retained the hardware, network and
+publication restrictions. Hardware acceptance is separate.
 
 ### C1: drafter discovery and compatibility
 
@@ -51,7 +49,7 @@ unmocked process, network request or signal in these tests.
 **Status: complete.** Forty-six new mocked cases cover kernel inventories,
 missing/invalid GPU queries, topology validation, server backend detection,
 cache/log inventories, bandwidth defaults/output/errors and fake numpy,
-permission/owner/flock failures and foreign-process filtering. All five modules
+permission/owner/flock failures and foreign-process filtering. All four modules
 have 100% line and branch coverage; plain pytest passes 243 tests. No runtime
 changes, predictor figure changes or departures. No real hardware measurements.
 
@@ -91,6 +89,24 @@ The CLI now has 100% line and branch coverage. Plain pytest passes 353 tests;
 the full Python package covers 2354/2354 statements and 726/726 branch outcomes,
 with no exclusions. No runtime changes or departures in this item; all
 bandwidth, server, network and signal operations remain mocked.
+
+### C6: preserve coverage in CI and verify distribution/Python compatibility
+
+**Status: complete for local coverage verification.** CI now requires 100% and
+checks JSON for zero missing statements, branches or excluded lines, while
+retaining HTML/JSON artifacts. Fresh throwaway editable-install venvs on Python
+3.9.25 and 3.14.2 pass plain pytest and reproduce the exact 100% totals. The
+extracted CI test/JSON shell block passes on 3.14.2, and actionlint validates
+both workflows. README and `docs/test-coverage.md` record the completed work
+and separate pending hardware/release acceptance checks. No departures.
+
+The updated x86_64 manylinux wheel also builds, repairs and starts its usage
+path successfully; its installed suite passes 352 tests and skips the existing
+real-permission test under root, as intended. No bandwidth kernels were run.
+The source archive includes every new test and passes all 353 against the
+installed repaired wheel on Python 3.14.2 from outside the checkout. Strict
+twine checks pass for the wheel and sdist. Made the graceful-stop test's clock
+fixed so a busy CI host cannot turn its fake immediate exit into a timeout.
 
 ## Decisions
 
