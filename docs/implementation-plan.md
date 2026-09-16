@@ -80,6 +80,18 @@ sweeps and instability reports. All three modules have 100% line and branch
 coverage; plain pytest passes 294 tests. No runtime changes or departures.
 Every subprocess and signal is fake, including the SIGTERM/SIGKILL cases.
 
+### C5: command flows and error reporting
+
+**Status: complete.** Fifty-nine fake-machine cases cover command success and
+failure output, missing files/server/GPU selections, incompatible drafts,
+pre-flight refusal/force, table limits, failed searches and sweeps, context
+skips/failures, emitted scripts, recommendation confidence and download choices,
+drafter verdicts, interruption/broken pipes and the module entry point.
+The CLI now has 100% line and branch coverage. Plain pytest passes 353 tests;
+the full Python package covers 2354/2354 statements and 726/726 branch outcomes,
+with no exclusions. No runtime changes or departures in this item; all
+bandwidth, server, network and signal operations remain mocked.
+
 ## Decisions
 
 | decision | why |
