@@ -612,7 +612,14 @@ pushed or tagged. The execution incident is recorded under 3.4.
 
 ---
 
-## Phase 4: prebuilt bandwidth probe in platform wheels (deferred)
+## Phase 4: prebuilt bandwidth probe in platform wheels
+
+**Status: in progress; acceptance checks pending.** The follow-up activates this
+phase. A standalone-executable wheel was successfully repaired by auditwheel
+without changing its `py3-none` ABI tag. The reproducible spike and the local
+glibc compatibility finding are in `docs/phase4-spike.md` and
+`tools/spike_probe_wheel.py`. ARM execution and real bandwidth acceptance remain
+pending; do not claim Phase 4 complete before those checks pass.
 
 **Start when** issues report "no C compiler", or before promoting the tool to
 people who don't build llama.cpp themselves. People running llama.cpp from
