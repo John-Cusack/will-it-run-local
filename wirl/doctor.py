@@ -288,7 +288,7 @@ def check_prompt_cache(server_log=None) -> Check:
     return Check("prompt-cache", OK, "no prompt-cache warnings in the server log.")
 
 
-def run_all(ram_need=None, cache_type_k="f16", path=".",
+def run_all(ram_need=None, cache_type_k="f16",
             llama_server=None, server_log=None, gpu_index=0) -> list:
     from .lock import foreign_gpu_users
     from .probe import cpu_info, gpu_info, mem_info
@@ -310,5 +310,4 @@ def run_all(ram_need=None, cache_type_k="f16", path=".",
     ]
     if ram_need is not None:
         checks.append(check_ram_for_model(mem, ram_need))
-        checks.append(check_disk(path, 0))
     return checks

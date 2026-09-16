@@ -572,6 +572,23 @@ that message and never calls `Popen`.
 
 ### 3.7 Small corrections
 
+**Status: complete.** Dense launcher notes name `--n-gpu-layers`; removed the
+unused results marker and the ineffective disk check/path parameter from
+`run_all` and its caller. One new mocked dense-auto launcher regression failed
+before the note fix and also verifies the emitted CPU list. Plain `pytest -q`:
+174 passed. Followed the plan; no existing tests changed for this item.
+
+**Final verification:** all 12 requested items are complete, each in its own
+local commit after a passing plain `pytest -q`; Phase 1 has its separate initial
+commit. Throwaway venvs installed with `pip install -e '.[dev]'` ran plain pytest
+from the repo root: Python 3.9.25 (pytest 8.4.2), 174 passed; Python 3.14.2 (the
+newest installed interpreter, pytest 9.1.1), 174 passed. Python 3.12.3 also passes
+all 174 tests. A read-only `lscpu -e=CPU,CORE,SOCKET` comparison confirms the
+detected CPU list contains the first allowed logical CPU of each physical core
+on this machine. The 64-core sweep and published predictor measurements remain
+unchanged. Phase 4 and the release checklist were not undertaken; nothing was
+pushed or tagged. The execution incident is recorded under 3.4.
+
 - `cli.py:471`: the notes in the emitted launcher say "found empirically at
   --n-cpu-moe" even for dense models; use `knob`.
 - `cli.py:385`: remove the unused `_RESULTS_MARK = None`.

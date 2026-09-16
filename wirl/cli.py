@@ -388,7 +388,6 @@ def cmd_auto(args):
 
     # ---- results ---------------------------------------------------------
     head("Measured results")
-    _RESULTS_MARK = None
     print(tune.summarise(results))
     rep = tune.repeatability(results)
     if rep:
@@ -474,7 +473,7 @@ def cmd_auto(args):
     cfg.host, cfg.port = args.emit_host, args.emit_port
     notes = (f"Chosen by measurement: {winner.mean:.2f} tok/s over {args.reps} runs "
              f"(spread {winner.spread_pct:.1f}%), {winner.peak_vram >> 20} MiB peak VRAM.\n"
-             f"VRAM boundary found empirically at --n-cpu-moe {edge}.\n"
+             f"VRAM boundary found empirically at {knob} {edge}.\n"
              f"Measured RAM bandwidth at the time: {bw_cpu/1e9:.0f} GB/s.")
     emit.write(out, emit.launch_script(cfg, binary,
                                        cpus=probe.physical_core_cpus(),
@@ -667,7 +666,6 @@ def cmd_doctor(args):
     head("Pre-flight checks")
     checks = doctor.run_all(ram_need=ram_need,
                             cache_type_k=args.cache_type_k,
-                            path=os.path.dirname(args.model) if args.model else ".",
                             llama_server=args.llama_server,
                             server_log=args.server_log, gpu_index=args.gpu)
     report.print_checks(checks)

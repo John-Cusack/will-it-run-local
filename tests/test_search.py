@@ -280,3 +280,28 @@ def test_auto_pins_selected_gpu(monkeypatch, tmp_path, moe_model):
     assert checks[0]["gpu_index"] == 1
     assert calls and all(c.gpu_uuid == "GPU-one" for c in calls)
     assert "export CUDA_VISIBLE_DEVICES=GPU-one" in out.read_text()
+
+
+def test_dense_auto_launcher_records_gpu_layer_boundary(monkeypatch, tmp_path, build_gguf):
+    from wirl import cli, doctor, lock, probe
+    from wirl.runner import RunResult
+    path = build_gguf(tmp_path / "dense.gguf", {
+        "general.architecture": (8, "dense"), "dense.block_count": (4, 4),
+        "dense.embedding_length": (4, 8)},
+        [(f"blk.{i}.attn_q.weight", (8, 8), 0) for i in range(4)])
+    monkeypatch.setattr(cli, "find_server", lambda *a: "mock-server")
+    monkeypatch.setattr(lock, "LOCK_PATH", str(tmp_path / "lock"))
+    monkeypatch.setattr(probe, "cpu_info", lambda: {"model": "test", "physical": 16})
+    monkeypatch.setattr(probe, "physical_core_cpus", lambda: [0, 2, 4])
+    monkeypatch.setattr(probe, "gpu_info", lambda: [
+        {"index": 0, "uuid": "GPU-zero", "name": "test", "vram_total": 24 << 30}])
+    monkeypatch.setattr(doctor, "run_all", lambda *a, **kw: [])
+    monkeypatch.setattr(search, "run_config", lambda cfg, *a, **kw:
+                        RunResult(cfg, [10.0], [], 100, 1.0, True))
+    out = tmp_path / "run.sh"
+    assert cli.main(["auto", path, "--mem-bandwidth", "20", "--no-depth",
+                     "--emit", str(out)]) == 0
+    script = out.read_text()
+    assert "VRAM boundary found empirically at --n-gpu-layers 4" in script
+    assert "--n-cpu-moe" not in script
+    assert "taskset -c 0,2,4" in script
