@@ -132,6 +132,17 @@ def evaluate(cand: Candidate, bw_cpu, bw_gpu, vram_budget, ram_available, ctx,
     mc, g = cand._cost, cand._gguf
     kv = model.kv_cache_bytes(g, ctx)
 
+    if vram_budget <= 0:
+        cand.knob, cand.knob_value = "--n-gpu-layers", 0
+        cand.tps = predict.cpu_only_tps(mc, bw_cpu)
+        cand.vram, cand.cpu_share = 0, 1.0
+        cand.confidence = "calibrated"
+        cand.ram_needed = mc.total_bytes + kv
+        cand.fits_at_all = cand.ram_needed <= ram_available
+        if not cand.fits_at_all:
+            cand.note = "would swap: not enough system RAM"
+        return cand
+
     # Can it be held at all, across VRAM and RAM together?
     cand.fits_at_all = mc.total_bytes + kv < (vram_budget + ram_available)
     if not cand.fits_at_all:

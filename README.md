@@ -527,6 +527,9 @@ itself:
 - **`wirl recommend` has not been validated end-to-end** — its predictions come
   from remote headers and have never been checked against downloading the
   recommended file and measuring it.
+- **CPU-only estimates use one calibration.** `CPU_ONLY_DERATE` (0.70) comes
+  from a single CPU-only measurement on the reference machine; verify the
+  estimate on other CPUs.
 - **Single GPU only.** With several present it uses index 0 unless told
   otherwise; multi-GPU splits are not modelled at all.
 - **The VRAM edge is found by whether the server starts, which is not the same

@@ -112,3 +112,51 @@ def test_confidence_tracks_how_much_is_read_from_ram(share, expected, monkeypatc
     monkeypatch.setattr(recommend.model, "kv_cache_bytes", lambda *a, **k: 0)
     recommend.evaluate(cand, 45e9, 936e9, 24e9, 200e9, 8192)
     assert cand.confidence == expected
+
+
+def _cpu_candidate(moe_model):
+    from wirl import gguf, model
+    cand = Candidate(name="Q4_K_M", files=["model.gguf"], size=1)
+    cand._gguf = gguf.read(moe_model)
+    cand._cost = model.build(cand._gguf)
+    return cand
+
+
+def test_cpu_only_recommendation_includes_kv(moe_model):
+    from wirl import model, predict
+    cand = _cpu_candidate(moe_model)
+    need = cand._cost.total_bytes + model.kv_cache_bytes(cand._gguf, 8192)
+    recommend.evaluate(cand, 20e9, 0, 0, need, 8192)
+    assert cand.fits_at_all
+    assert cand.tps == predict.cpu_only_tps(cand._cost, 20e9)
+    assert cand.knob == "--n-gpu-layers" and cand.knob_value == 0
+    assert cand.ram_needed == need
+    assert cand.vram == 0 and cand.cpu_share == 1.0
+    assert cand.confidence == "calibrated"
+
+
+def test_cpu_only_recommendation_refuses_swap(moe_model):
+    from wirl import model
+    cand = _cpu_candidate(moe_model)
+    need = cand._cost.total_bytes + model.kv_cache_bytes(cand._gguf, 8192)
+    recommend.evaluate(cand, 20e9, 0, 0, need - 1, 8192)
+    assert not cand.fits_at_all
+    assert "swap" in cand.note
+
+
+def test_recommend_cli_without_gpu(monkeypatch, capsys, moe_model):
+    from wirl import cli, compat, probe
+    from test_search import _no_gpu
+    _no_gpu(monkeypatch)
+    monkeypatch.setattr(probe, "mem_info", lambda: {"available": 64 << 30})
+    monkeypatch.setattr(probe, "cpu_info", lambda: {"physical": 16})
+    monkeypatch.setattr(compat, "list_gguf", lambda repo: [{"path": "Q4_K_M.gguf", "size": 1}])
+
+    def load(repo, cand):
+        source = _cpu_candidate(moe_model)
+        cand._gguf, cand._cost = source._gguf, source._cost
+
+    monkeypatch.setattr(recommend, "load_remote", load)
+    assert cli.main(["recommend", "some/repo", "--mem-bandwidth", "20"]) == 0
+    out = capsys.readouterr().out
+    assert "Download" in out and "--n-gpu-layers 0" in out

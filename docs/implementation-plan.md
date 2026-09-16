@@ -95,6 +95,14 @@ outside the source tree, and compiles the probe from the installed package.
 
 ### 2.1 `wirl recommend` says nothing fits on a machine with no GPU
 
+**Status: complete.** Added CPU-only estimates, KV-inclusive RAM accounting,
+swap rejection and README calibration caveat. Three regression tests failed
+before the fix and pass afterwards; plain `pytest -q`: 112 passed.
+
+**Departure:** handle CPU-only before the generic combined-pool rejection.
+Otherwise insufficient RAM returns before the specified swap note can be set.
+An exact RAM fit is accepted, consistent with the planned `>` swap check.
+
 **Problem.** With no GPU, `cmd_recommend` sets the VRAM budget to 0
 (`cli.py:512`). `recommend.evaluate` then calls `predict.best_fit` or
 `best_fit_dense`, which both add `CUDA_OVERHEAD` (0.4 GB) to every
