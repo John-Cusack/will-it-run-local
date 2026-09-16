@@ -13,9 +13,11 @@ tok/s hours apart, and only the spread made that visible.
 from __future__ import annotations
 
 import json
+import errno
 import os
 import shutil
 import signal
+import socket
 import statistics
 import subprocess
 import threading
@@ -207,6 +209,23 @@ class ServerFailed(RuntimeError):
     """The server never became healthy. Almost always VRAM."""
 
 
+def _check_port(host, port):
+    try:
+        addresses = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+        for family, socktype, protocol, _, address in addresses:
+            with socket.socket(family, socktype, protocol) as candidate:
+                # The previous sweep's closed connections may still be in
+                # TIME_WAIT; a live listener, rather than those, must block us.
+                candidate.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                candidate.bind(address)
+    except OSError as e:
+        if e.errno == errno.EADDRINUSE:
+            raise ServerFailed(
+                f"benchmark port {host}:{port} is in use; an old llama-server "
+                "may still be running. Stop it or choose another --port.") from None
+        raise ServerFailed(f"cannot bind benchmark address {host}:{port}: {e}") from None
+
+
 @contextmanager
 def server(cfg: RunConfig, binary: str, startup_timeout=1200, log_dir=None,
            verbose=True):
@@ -217,6 +236,7 @@ def server(cfg: RunConfig, binary: str, startup_timeout=1200, log_dir=None,
     server -- prefill speed, decode with a long history -- should be, rather
     than paying for another startup.
     """
+    _check_port(cfg.host, cfg.port)
     argv = cfg.argv(binary)
     logf = None
     if log_dir:

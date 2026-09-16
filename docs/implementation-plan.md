@@ -544,6 +544,17 @@ right hash is reused without invoking the compiler (monkeypatch
 
 ### 3.6 A stale server on the benchmark port
 
+**Status: complete.** Check the resolved host/port before creating logs or
+calling `Popen`, with an old-server hint for an occupied port. Two held-socket
+IPv4/IPv6 cases failed before the fix; a third checks invalid-address errors.
+Plain `pytest -q`: 173 passed. The existing mocked launch/environment test now
+uses port 0 so the bind check never depends on a real benchmark port being free.
+
+**Departure:** use `SO_REUSEADDR` so closed sweep connections in TIME_WAIT don't
+cause a false refusal. Report non-occupancy bind errors with their real reason
+rather than claiming every failure is an old server. Resolve IPv4/IPv6 addresses
+and check each. The check cannot eliminate the bind-to-launch race completely.
+
 **Problem.** Servers start with `start_new_session=True` (`runner.py:223`).
 If `wirl` is killed outright (SIGKILL, or an SSH session dropping), llama-server
 keeps running and keeps port 38080. A later run's readiness check

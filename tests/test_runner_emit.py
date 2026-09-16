@@ -142,7 +142,7 @@ def test_server_pins_selected_uuid(monkeypatch, uuid):
     monkeypatch.setattr(runner.subprocess, "Popen", lambda *a, **kw: calls.append(kw) or object())
     monkeypatch.setattr(runner, "_wait_health", lambda *a: 1.0)
     monkeypatch.setattr(runner, "_stop", lambda *a: None)
-    with runner.server(RunConfig("m", gpu_uuid=uuid), "s", verbose=False):
+    with runner.server(RunConfig("m", gpu_uuid=uuid, port=0), "s", verbose=False):
         pass
     assert calls[0]["env"]["CUDA_VISIBLE_DEVICES"] == (uuid or "inherited")
     assert runner.os.environ["CUDA_VISIBLE_DEVICES"] == "inherited"
@@ -317,3 +317,44 @@ def test_failed_vram_sampling_is_not_a_successful_measurement(monkeypatch):
     monkeypatch.setattr(runner, "gpu_used_bytes", failed_sample)
     result = runner.run_config(RunConfig("m"), "s", reps=1, verbose=False)
     assert not result.ok and "VRAM sampling failed" in result.error
+
+
+@pytest.mark.parametrize("host,family", [("127.0.0.1", "AF_INET"), ("::1", "AF_INET6")])
+def test_occupied_benchmark_port_never_launches(monkeypatch, host, family):
+    import socket
+    from wirl import runner
+    calls = []
+    monkeypatch.setattr(runner.subprocess, "Popen", lambda *a, **kw: calls.append(a) or object())
+    monkeypatch.setattr(runner, "_wait_health", lambda *a: 1.0)
+    monkeypatch.setattr(runner, "_stop", lambda *a: None)
+    with socket.socket(getattr(socket, family), socket.SOCK_STREAM) as holder:
+        try:
+            holder.bind((host, 0))
+        except OSError:
+            if family == "AF_INET6":
+                pytest.skip("IPv6 loopback unavailable")
+            raise
+        holder.listen(1)
+        port = holder.getsockname()[1]
+        with pytest.raises(runner.ServerFailed, match="port.*in use.*old llama-server"):
+            with runner.server(RunConfig("m", host=host, port=port), "s", verbose=False):
+                pass
+    assert not calls
+
+
+def test_invalid_bind_address_reports_real_reason(monkeypatch):
+    import socket
+    from wirl import runner
+    calls = []
+
+    def unresolved(*a, **kw):
+        raise socket.gaierror("synthetic address error")
+
+    monkeypatch.setattr(runner.socket, "getaddrinfo", unresolved, raising=False)
+    monkeypatch.setattr(runner.subprocess, "Popen", lambda *a, **kw: calls.append(a) or object())
+    monkeypatch.setattr(runner, "_wait_health", lambda *a: 1.0)
+    monkeypatch.setattr(runner, "_stop", lambda *a: None)
+    with pytest.raises(runner.ServerFailed, match="cannot bind.*synthetic address error"):
+        with runner.server(RunConfig("m", host="invalid", port=0), "s", verbose=False):
+            pass
+    assert not calls
