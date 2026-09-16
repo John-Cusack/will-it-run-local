@@ -7,6 +7,12 @@ import pytest
 from wirl import membw
 
 
+@pytest.fixture(autouse=True)
+def no_packaged_probe(monkeypatch, tmp_path):
+    # Compilation tests must also run against a wheel containing a real probe.
+    monkeypatch.setattr(membw, "PACKAGED_PROBE", str(tmp_path / "absent"), raising=False)
+
+
 def test_compile_failure_reports_compiler_reason(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("CC", "/bin/false")
     monkeypatch.setattr(membw, "cache_dir", lambda: str(tmp_path))
@@ -117,3 +123,56 @@ def test_concurrent_compiles_use_separate_temporary_outputs(compiler, monkeypatc
     assert all(output != results[0] for output in outputs)
     assert Path(results[0]).read_bytes() == b"complete binary"
     assert list(compiler[1].iterdir()) == [Path(results[0])]
+
+
+def test_packaged_probe_needs_no_compiler_or_cache(monkeypatch, tmp_path):
+    binary = tmp_path / "packaged-membw"
+    binary.write_bytes(b"fake executable")
+    binary.chmod(0o755)
+    monkeypatch.setattr(membw, "PACKAGED_PROBE", str(binary), raising=False)
+
+    def unexpected(*a):
+        pytest.fail("prebuilt probe should not need a compiler or writable cache")
+
+    monkeypatch.setattr(membw.shutil, "which", unexpected)
+    monkeypatch.setattr(membw, "cache_dir", unexpected)
+    monkeypatch.delenv("CC", raising=False)
+    assert membw.build_probe() == str(binary)
+
+
+def test_non_executable_packaged_probe_falls_back_to_source(compiler, monkeypatch):
+    binary = compiler[0].parent / "bad-packaged-membw"
+    binary.write_bytes(b"fake executable")
+    binary.chmod(0o644)
+    monkeypatch.setattr(membw, "PACKAGED_PROBE", str(binary), raising=False)
+    result = membw.build_probe()
+    assert result != str(binary) and compiler[2]
+
+
+def test_force_rebuild_ignores_packaged_probe(compiler, monkeypatch):
+    binary = compiler[0].parent / "packaged-membw"
+    binary.write_bytes(b"fake executable")
+    binary.chmod(0o755)
+    monkeypatch.setattr(membw, "PACKAGED_PROBE", str(binary), raising=False)
+    result = membw.build_probe(force=True)
+    assert result != str(binary) and compiler[2]
+
+
+def test_measure_uses_prebuilt_with_no_compiler(monkeypatch, tmp_path):
+    monkeypatch.setattr(membw, "_numpy_stream", lambda *a: None)
+    binary = tmp_path / "packaged-membw"
+    binary.write_bytes(b"fake executable")
+    binary.chmod(0o755)
+    monkeypatch.setattr(membw, "PACKAGED_PROBE", str(binary), raising=False)
+    monkeypatch.setattr(membw.shutil, "which", lambda name: None)
+    monkeypatch.delenv("CC", raising=False)
+    calls = []
+
+    def run(cmd, **kw):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "stream 0 1.0 1073741824\n", "")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    result = membw.measure(threads=1, gib=1, reps=1)
+    assert result.samples == [pytest.approx(1.073741824)]
+    assert calls == [[str(binary), "stream", "1", "1", "1"]]

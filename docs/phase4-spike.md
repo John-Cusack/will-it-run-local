@@ -29,3 +29,38 @@ GitHub documents the native
 ARM execution and the alternating reference-machine bandwidth comparison
 remain acceptance checks. No ARM runner is available locally, and the user has
 not lifted the restriction on real bandwidth benchmarks.
+
+## Actual setuptools/cibuildwheel build
+
+The first full build exposed an extra requirement: setting a platform wheel
+tag and `Root-Is-Purelib: false` alone still sent the package to
+`.data/purelib`, because setuptools considered the distribution pure Python.
+Auditwheel rejected the executable in that directory. `BinaryDistribution`
+now selects the platlib scheme, and a mocked regression verifies that routing.
+
+With cibuildwheel 4.2.1 and the manylinux_2_28 x86_64 image, the repaired wheel
+contains `wirl/_bin/membw` with executable permissions and these tags:
+
+```text
+py3-none-manylinux_2_17_x86_64
+py3-none-manylinux2014_x86_64
+py3-none-manylinux_2_28_x86_64
+```
+
+This is auditwheel's measured compatibility result, rather than a manually
+applied older tag. The source archive contains the C source, build hooks and
+tests, and excludes generated binaries. Twine's strict metadata check passes.
+
+The safe local build overrides CI's measurement command:
+
+```bash
+CIBW_TEST_COMMAND='python {project}/tools/check_installed_probe.py && pytest -q {project}/tests' \
+  cibuildwheel --platform linux --output-dir /tmp/wirl-wheels
+```
+
+The default checker executes only the C program's argument-error path, which
+returns before any allocation. The built wheel installs and starts that path
+in a network-disabled `python:3.12-slim-bookworm` container, with actual compiler
+absence checked separately. CI uses `--measure` on isolated native runners,
+including a compiler-free container, to exercise both kernels. Those CI runs
+and the reference-machine comparison are still pending.

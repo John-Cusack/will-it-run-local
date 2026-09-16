@@ -23,6 +23,7 @@ import tempfile
 from dataclasses import dataclass
 
 CSRC = os.path.join(os.path.dirname(__file__), "csrc", "membw.c")
+PACKAGED_PROBE = os.path.join(os.path.dirname(__file__), "_bin", "membw")
 
 
 def cache_dir() -> str:
@@ -36,6 +37,8 @@ def _build_probe(force=False) -> tuple:
     """Return (binary, failure reason), keeping diagnostics with the result."""
     if sys.platform != "linux":
         return None, "will-it-run-local supports Linux only"
+    if not force and os.path.isfile(PACKAGED_PROBE) and os.access(PACKAGED_PROBE, os.X_OK):
+        return PACKAGED_PROBE, None
     cc = os.environ.get("CC") or shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
     if not cc:
         return None, "no C compiler found (tried cc, gcc and clang)"
@@ -74,7 +77,7 @@ def _build_probe(force=False) -> tuple:
 
 
 def build_probe(force=False) -> str | None:
-    """Compile the probe, reporting why no binary could be produced."""
+    """Prefer the packaged probe; force=True explicitly recompiles its source."""
     binary, reason = _build_probe(force)
     if reason:
         print(f"warning: {reason}", file=sys.stderr)

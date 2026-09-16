@@ -70,7 +70,9 @@ jobs:
       - name: Tests from the sdist, against the installed wheel
         run: |
           python -m venv "$RUNNER_TEMP/venv"
-          "$RUNNER_TEMP/venv/bin/pip" install dist/*.whl pytest
+          for wheel in dist/*.whl; do
+            "$RUNNER_TEMP/venv/bin/pip" install "${wheel}[dev]"
+          done
           mkdir "$RUNNER_TEMP/sdist"
           tar xzf dist/*.tar.gz -C "$RUNNER_TEMP/sdist" --strip-components=1
           # Run from outside the source tree so `wirl` can only resolve to
@@ -80,3 +82,44 @@ jobs:
           "$RUNNER_TEMP/venv/bin/pytest" -q -p no:cacheprovider sdist/tests
           "$RUNNER_TEMP/venv/bin/python" -c "from wirl.membw import build_probe; assert build_probe(force=True)"
           "$RUNNER_TEMP/venv/bin/wirl" --version
+
+  wheels:
+    # Native runners keep the ARM probe test meaningful and avoid emulation.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Build, repair and test platform wheel
+        run: |
+          python -m pip install cibuildwheel==4.2.1 twine
+          cibuildwheel --platform linux --output-dir wheelhouse
+          twine check --strict wheelhouse/*
+
+      - name: Measure from a wheel in a container without a compiler
+        run: |
+          docker run --rm --network none \
+            -v "$PWD/wheelhouse:/wheels:ro" \
+            -v "$PWD/tools:/checks:ro" \
+            python:3.12-slim-bookworm sh -eu -c '
+              python -m pip install --no-index --no-deps /wheels/*.whl
+              python -c "import shutil; assert not any(shutil.which(cc) for cc in (\"cc\", \"gcc\", \"clang\"))"
+              python /checks/check_installed_probe.py --measure
+            '
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.arch }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error

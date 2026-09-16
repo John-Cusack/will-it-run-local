@@ -31,7 +31,7 @@ workstream; no paths are excluded to inflate the result.
 |---|---|
 | Ship a CLI tool, not a library | the modules change with every calibration; nobody should import `wirl.predict` and expect it to hold still, and the README should not suggest they can |
 | Version 0.1.0, `Development Status :: 3 - Alpha` | tested on one machine, which the README already says |
-| Keep compiling the bandwidth probe on first run, for now | anyone who built llama.cpp with CUDA has a C compiler; prebuilt wheels are Phase 4 and start when evidence says so |
+| Bundle the unchanged probe in Linux x86_64/aarch64 wheels; retain source compilation | the follow-up activates Phase 4 so prebuilt/Docker llama.cpp users need no compiler |
 | Linux only, declared in the metadata | the code depends on `fcntl`, `/proc`, `/sys`, `pthread_setaffinity_np`, `taskset` and systemd |
 | PyPI trusted publishing, no API tokens | nothing to leak or rotate |
 
@@ -614,12 +614,52 @@ pushed or tagged. The execution incident is recorded under 3.4.
 
 ## Phase 4: prebuilt bandwidth probe in platform wheels
 
-**Status: in progress; acceptance checks pending.** The follow-up activates this
-phase. A standalone-executable wheel was successfully repaired by auditwheel
-without changing its `py3-none` ABI tag. The reproducible spike and the local
-glibc compatibility finding are in `docs/phase4-spike.md` and
-`tools/spike_probe_wheel.py`. ARM execution and real bandwidth acceptance remain
-pending; do not claim Phase 4 complete before those checks pass.
+**Status: implementation complete; hardware/ARM acceptance pending.** Added
+Linux-only build hooks compiling the unchanged C source with `-O2 -pthread`,
+Python-independent platform wheel tags, packaged-probe selection, a source-only
+sdist, and native x86_64/aarch64 cibuildwheel CI. The release workflow collects
+those tested wheels alongside the sdist. README describes the packaged probe
+and the optional numpy fallback. No external settings, tags or pushes changed.
+
+**Tests:** thirteen new mocked tests cover compilation flags and executable
+permissions, absent compiler/stale output cleanup, strict release builds,
+failed compilation, Python-independent tags, platlib routing, unsupported OS
+and architecture, editable installs, packaged selection without cache/compiler,
+unusable packaged files, explicit source rebuilds and mocked measurements.
+The packaged-selection and measurement regressions failed without the runtime
+fix; the platlib regression failed before the distribution fix. Existing
+compilation tests explicitly hide a packaged binary so the same assertions run
+against both checkouts and installed wheels; none were weakened or removed.
+
+**Integration:** the real x86_64 wheel builds in manylinux_2_28 and auditwheel
+repairs it to `py3-none` manylinux tags, including compatibility with glibc 2.17.
+Installation in a network-disabled Debian slim container with no cc/gcc/clang
+passes the loader/selection smoke check without allocating benchmark buffers.
+CI additionally performs actual stream/gather checks on isolated runners and
+in compiler-free containers. Local Python 3.9.25, 3.12.3 and 3.14.2 suites pass
+187 tests with the development extra. The spike details are in
+`docs/phase4-spike.md` and `tools/spike_probe_wheel.py`.
+The same repaired wheel also passes all 187 source-archive tests in fresh
+Python 3.9/3.14 venvs from outside the checkout; imports were checked to resolve
+to site-packages, and both interpreters start the bundled executable's usage
+path. Strict twine checks pass for the wheel and source archive.
+
+**Departures:** marking `root_is_pure=False` alone placed the executable in
+`.data/purelib`, which auditwheel rejected in the first real wheel build. A
+binary `Distribution` also selects the platlib installation scheme; this keeps
+the executable in the wheel root without introducing a Python extension.
+Release CI uses `WIRL_REQUIRE_PROBE=1` to fail rather than publish a source-only
+wheel after compiler discovery fails. `build_probe(force=True)` still compiles
+source for the existing CI check; normal calls prefer the packaged executable.
+The fallback to numpy belongs to `measure`, preserving the existing public
+path-or-None result of `build_probe`.
+
+**Done-when checks still pending:** native ARM execution and the alternating
+reference-machine bandwidth comparison (three runs per probe per mode), plus
+the actual compiler-free container measurements in CI. No ARM runner is
+available locally. The earlier prohibition on real bandwidth runs still
+applies here, so the local container check deliberately exercises usage only.
+Do not claim Phase 4 fully accepted until those measurements pass.
 
 **Start when** issues report "no C compiler", or before promoting the tool to
 people who don't build llama.cpp themselves. People running llama.cpp from
@@ -673,6 +713,11 @@ CPython versions for no benefit.
 ---
 
 ## Release checklist
+
+**Status: pending; no publication actions taken.** Local platform-wheel and
+sdist preparation is implemented under Phase 4. Account/environment setup,
+main-branch CI, README publication instructions, tagging, pushing and PyPI
+installation checks remain untouched under the earlier release restriction.
 
 ### One-time setup
 

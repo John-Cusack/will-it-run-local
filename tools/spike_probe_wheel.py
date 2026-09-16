@@ -9,6 +9,7 @@ import argparse
 import csv
 import io
 import os
+import platform
 from pathlib import Path
 import shlex
 import subprocess
@@ -22,6 +23,7 @@ def main():
     parser.add_argument("--plat", required=True)
     args = parser.parse_args()
     source = Path(__file__).resolve().parents[1] / "wirl" / "csrc" / "membw.c"
+    architecture = platform.machine()
     args.output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as temporary:
         binary = Path(temporary) / "membw"
@@ -32,7 +34,7 @@ def main():
             "wirl/_bin/membw": binary.read_bytes(),
             f"{info}/METADATA": b"Metadata-Version: 2.1\nName: wirl-probe-spike\nVersion: 0.0.0\n",
             f"{info}/WHEEL": ("Wheel-Version: 1.0\nGenerator: local-spike\n"
-                              "Root-Is-Purelib: false\nTag: py3-none-linux_x86_64\n").encode(),
+                              f"Root-Is-Purelib: false\nTag: py3-none-linux_{architecture}\n").encode(),
         }
     record = io.StringIO()
     writer = csv.writer(record)
@@ -40,7 +42,7 @@ def main():
         writer.writerow((name, "", len(data)))
     writer.writerow((f"{info}/RECORD", "", ""))
     files[f"{info}/RECORD"] = record.getvalue().encode()
-    wheel = args.output / "wirl_probe_spike-0.0.0-py3-none-linux_x86_64.whl"
+    wheel = args.output / f"wirl_probe_spike-0.0.0-py3-none-linux_{architecture}.whl"
     with ZipFile(wheel, "w") as archive:
         for name, data in files.items():
             entry = ZipInfo(name)

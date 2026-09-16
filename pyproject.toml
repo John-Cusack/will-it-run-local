@@ -30,7 +30,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "pytest-cov>=4"]
+dev = ["pytest>=7", "pytest-cov>=4", "setuptools>=77"]
 
 [project.scripts]
 wirl = "wirl.cli:main"
@@ -45,9 +45,10 @@ version = { attr = "wirl.__version__" }
 [tool.setuptools.packages.find]
 include = ["wirl", "wirl.*"]
 
-# The bandwidth probe ships as source and is compiled on first use.
+# Keep source for development installs and bundle the probe in platform wheels.
 [tool.setuptools.package-data]
 "wirl.csrc" = ["*.c"]
+wirl = ["_bin/membw"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -59,3 +60,18 @@ source = ["wirl"]
 [tool.coverage.report]
 show_missing = true
 precision = 2
+
+[tool.cibuildwheel]
+# The executable has no Python ABI: one build covers every supported Python.
+build = "cp312-manylinux_*"
+test-extras = ["dev"]
+test-command = [
+    "python {project}/tools/check_installed_probe.py --measure",
+    "pytest -q {project}/tests",
+]
+environment = { WIRL_REQUIRE_PROBE = "1" }
+
+[tool.cibuildwheel.linux]
+archs = ["native"]
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"

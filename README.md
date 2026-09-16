@@ -108,8 +108,10 @@ pip install -e .
 
 Python 3.9+. **No runtime dependencies** — this runs on machines that are
 already short on memory and should never be the reason an environment breaks.
-A C compiler is used to build the bandwidth probe on first run; without one it
-falls back to numpy and says so.
+Linux x86_64 and aarch64 platform wheels include the bandwidth probe. Source
+installs compile it with a C compiler; if no prebuilt probe or compiler is
+available, an already installed numpy provides a single-threaded lower bound.
+Numpy is optional and is not installed by this tool.
 
 ## Commands
 
