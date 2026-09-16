@@ -30,7 +30,21 @@ jobs:
       - name: Tests
         # No GPU, no model files, and no network: the suite builds its own
         # synthetic GGUFs and mocks every server launch.
-        run: pytest -q
+        run: |
+          if [ "${{ matrix.python-version }}" = "3.14" ]; then
+            pytest -q --cov=wirl --cov-branch --cov-report=term-missing --cov-report=json --cov-report=html
+          else
+            pytest -q
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.python-version == '3.14'
+        with:
+          name: python-coverage
+          path: |
+            coverage.json
+            htmlcov/
+          if-no-files-found: error
 
       - name: Bandwidth probe compiles
         run: |

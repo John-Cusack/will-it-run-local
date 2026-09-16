@@ -5,6 +5,13 @@ coverage** (1610/2352 statements) and **53.03% branch coverage** (385/726).
 There are 742 unexecuted statements and 341 unexecuted branch outcomes. No
 source files or error paths were excluded from this measurement.
 
+After Phase 4's mocked packaging/runtime tests: **187 tests pass**, with
+**69.00% line coverage** (1625/2355 statements) and **54.12% branch coverage**
+(394/728). Reaching 100% still requires covering **730 statements** and
+**334 branch outcomes**, chiefly in the same areas listed below. Both local
+measurements use Python 3.12.3; the latest totals also reproduce exactly on
+Python 3.14.2. CI collects JSON/HTML reports on Python 3.14.
+
 Install the development extra and use the real pytest entry point from the
 repository root, matching CI:
 
@@ -18,6 +25,10 @@ The HTML report is written to `htmlcov/index.html`. These are Python execution
 metrics: the C probe and GitHub workflow shell steps require separate build and
 integration checks. Even 100% line and branch coverage cannot establish the
 accuracy of a bandwidth prediction on unmeasured hardware.
+CI uploads `coverage.json` and the HTML report as the `python-coverage` artifact
+without applying a threshold the suite does not yet meet. The combined coverage
+percentage also includes branches; use the separate statement/branch fields
+in JSON when assessing progress towards 100%.
 
 ## Work required for 100%
 

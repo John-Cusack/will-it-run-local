@@ -19,11 +19,16 @@ operations, pushing and tagging remain in force. Implement and test the local
 packaging/release preparation, and leave the hardware acceptance measurements
 and external account setup explicitly pending.
 
-**Coverage status: measured, not 100%.** Phases 1–3 have 174 passing tests;
-the full Python package has 68.45% line and 53.03% branch coverage. Added
-development-only coverage tooling and a concrete gap inventory in
-`docs/test-coverage.md`. Full line/branch coverage is a separate outstanding
-workstream; no paths are excluded to inflate the result.
+**Coverage status: measured, not 100%.** Phase 4 brings the suite to 187 passing
+tests. The Python package has 69.00% line and 54.12% branch coverage, leaving
+730 statements and 334 branch outcomes unexecuted (Python 3.12.3 measurement).
+Added development-only coverage tooling, CI JSON/HTML artifacts on 3.14 and a
+concrete gap inventory in `docs/test-coverage.md`. Full line/branch coverage is
+an outstanding workstream; no paths are excluded to inflate the result. The
+Phase 1–3 baseline is retained in that document for comparison.
+The latest totals also reproduce on Python 3.14.2. Both edited workflows pass
+actionlint 1.7.12 locally; their remote jobs remain pending until authorised
+pushing/CI execution.
 
 ## Decisions
 
