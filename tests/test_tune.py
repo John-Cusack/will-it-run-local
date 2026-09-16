@@ -76,3 +76,22 @@ def test_offload_sweep_stops_at_first_failure(monkeypatch, moe, candidates):
     monkeypatch.setattr(tune, "run_config", run)
     results = tune.sweep_offload(RunConfig("m"), "s", candidates, moe)
     assert len(results) == len(calls) == 1
+
+
+@pytest.mark.parametrize("index", [3, -1])
+def test_invalid_gpu_choice_is_an_error(monkeypatch, moe_model, index):
+    monkeypatch.setattr(probe, "gpu_info", lambda: [
+        {"index": 0, "name": "only GPU", "uuid": "GPU-zero", "vram_total": 24 << 30}])
+    with pytest.raises(SystemExit, match="available GPUs:.*0.*only GPU"):
+        cli.main(["plan", moe_model, "--gpu", str(index), "--mem-bandwidth", "20"])
+
+
+def test_tune_selects_physical_gpu(monkeypatch, moe_model, tune_calls):
+    seen = []
+    monkeypatch.setattr(probe, "gpu_info", lambda: [
+        {"index": 1, "name": "selected", "uuid": "GPU-one", "vram_total": 24 << 30},
+        {"index": 0, "name": "other", "uuid": "GPU-zero", "vram_total": 24 << 30}])
+    monkeypatch.setattr(cli, "foreign_gpu_users", lambda **kw: seen.append(kw) or [])
+    assert cli.main(["tune", moe_model, "--gpu", "1", "--mem-bandwidth", "20"]) == 0
+    assert seen == [{"gpu_uuid": "GPU-one"}]
+    assert all(c.gpu_uuid == "GPU-one" for c in tune_calls)

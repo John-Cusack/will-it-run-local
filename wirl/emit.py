@@ -14,6 +14,9 @@ def launch_script(cfg, binary, physical_cores=None, extra_comment="") -> str:
     if extra_comment:
         lines += ["#", *[f"# {l}" for l in extra_comment.splitlines()]]
     lines += ["set -euo pipefail", ""]
+    if cfg.gpu_uuid:
+        lines.append("# Pin the card that was measured, even if GPU indices change.")
+        lines.append(f"export CUDA_VISIBLE_DEVICES={shlex.quote(cfg.gpu_uuid)}")
 
     pin = ""
     if physical_cores:

@@ -68,19 +68,21 @@ def check_dimm_population(mem) -> Check:
                  f"EDAC {_gib(edac):.0f} GiB vs kernel {_gib(total):.0f} GiB: consistent.")
 
 
-def check_gpu_free(gpus, foreign) -> Check:
+def check_gpu_free(gpus, foreign, gpu_index=0) -> Check:
     if not gpus:
         return Check("gpu", WARN, "no NVIDIA GPU detected.",
                      "CPU-only inference on a large MoE is roughly 4x slower "
                      "than a hybrid split. Expect single-digit tokens/sec.")
+    g = next((g for i, g in enumerate(gpus) if g.get("index", i) == gpu_index), None)
+    if g is None:
+        return Check("gpu", FAIL, f"GPU index {gpu_index} is not available.")
     if foreign:
         who = ", ".join(f"{p['name']} (pid {p['pid']}, {p['vram_mb']} MB)"
                         for p in foreign)
         return Check("gpu-exclusive", FAIL,
-                     f"other processes are using the GPU: {who}",
+                     f"other processes are using {g['name']} (GPU {gpu_index}): {who}",
                      "Stop them before measuring. VRAM fitting will be wrong "
                      "and timings will be contended.")
-    g = gpus[0]
     return Check("gpu-exclusive", OK,
                  f"{g['name']}, {_gib(g['vram_total']):.0f} GiB, "
                  f"{_gib(g['vram_free']):.1f} GiB free, driver {g['driver']}.")
@@ -286,15 +288,17 @@ def check_prompt_cache(server_log=None) -> Check:
 
 
 def run_all(model_bytes=None, gpu_bytes=0, cache_type_k="f16", path=".",
-            llama_server=None, server_log=None) -> list:
+            llama_server=None, server_log=None, gpu_index=0) -> list:
     from .lock import foreign_gpu_users
     from .probe import cpu_info, gpu_info, mem_info
 
     cpu, mem, gpus = cpu_info(), mem_info(), gpu_info()
+    selected = next((g for g in gpus if g["index"] == gpu_index), None)
+    foreign = foreign_gpu_users(gpu_uuid=selected["uuid"]) if selected else []
     checks = [
         check_llama_server(llama_server),
         check_isa(cpu),
-        check_gpu_free(gpus, foreign_gpu_users()),
+        check_gpu_free(gpus, foreign, gpu_index),
         check_swap(mem),
         check_dimm_population(mem),
         check_governor(cpu),

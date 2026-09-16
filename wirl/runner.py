@@ -44,6 +44,7 @@ class RunConfig:
     host: str = "127.0.0.1"
     port: int = 38080
     extra: list = field(default_factory=list)
+    gpu_uuid: str | None = None
 
     def argv(self, binary: str) -> list:
         a = [binary, "--model", self.model, "--host", self.host,
@@ -114,10 +115,10 @@ def find_server(explicit=None) -> str | None:
     return None
 
 
-def gpu_used_bytes(index=0) -> int:
+def gpu_used_bytes(uuid=None) -> int:
     from .probe import gpu_info
     for g in gpu_info():
-        if g["index"] == index:
+        if (g.get("uuid") == uuid if uuid is not None else g["index"] == 0):
             return g["vram_used"]
     return 0
 
@@ -220,8 +221,11 @@ def server(cfg: RunConfig, binary: str, startup_timeout=1200, log_dir=None,
         logf = open(os.path.join(
             log_dir, f"llama-{cfg.n_cpu_moe}-{cfg.threads}-{cfg.draft_n_max}-"
                      f"{cfg.ctx}-{int(time.time())}.log"), "wb")
+    env = os.environ.copy()
+    if cfg.gpu_uuid:
+        env["CUDA_VISIBLE_DEVICES"] = cfg.gpu_uuid
     proc = subprocess.Popen(argv, stdout=logf or subprocess.DEVNULL,
-                            stderr=subprocess.STDOUT, start_new_session=True)
+                            stderr=subprocess.STDOUT, start_new_session=True, env=env)
     try:
         started = _wait_health(cfg.host, cfg.port, proc, startup_timeout)
         if started is None:
@@ -249,7 +253,7 @@ def run_config(cfg: RunConfig, binary: str, reps=3, n_tokens=400,
                     samples.append(tps)
                 if pre:
                     prefill.append(pre)
-                peak = max(peak, gpu_used_bytes())
+                peak = max(peak, gpu_used_bytes(cfg.gpu_uuid))
                 if verbose:
                     print(f"    rep{i}: {tps:.2f} tok/s", flush=True)
             return RunResult(cfg, samples, prefill, peak, started, True)

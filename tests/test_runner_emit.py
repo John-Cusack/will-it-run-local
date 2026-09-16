@@ -126,3 +126,60 @@ def test_readiness_requires_a_real_generation(monkeypatch):
     monkeypatch.setattr(R, "_generate", gen)
     assert R._wait_health("h", 1, FakeProc(), timeout=60) is not None
     assert calls["n"] == 3, "should have retried until generation succeeded"
+
+
+@pytest.mark.parametrize("uuid", [None, "GPU-one"])
+def test_server_pins_selected_uuid(monkeypatch, uuid):
+    from wirl import runner
+    calls = []
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "inherited")
+    monkeypatch.setattr(runner.subprocess, "Popen", lambda *a, **kw: calls.append(kw) or object())
+    monkeypatch.setattr(runner, "_wait_health", lambda *a: 1.0)
+    monkeypatch.setattr(runner, "_stop", lambda *a: None)
+    with runner.server(RunConfig("m", gpu_uuid=uuid), "s", verbose=False):
+        pass
+    assert calls[0]["env"]["CUDA_VISIBLE_DEVICES"] == (uuid or "inherited")
+    assert runner.os.environ["CUDA_VISIBLE_DEVICES"] == "inherited"
+
+
+def test_vram_reads_selected_uuid(monkeypatch):
+    from wirl import probe, runner
+    monkeypatch.setattr(probe, "gpu_info", lambda: [
+        {"index": 0, "uuid": "GPU-zero", "vram_used": 10},
+        {"index": 1, "uuid": "GPU-one", "vram_used": 20}])
+    assert runner.gpu_used_bytes("GPU-one") == 20
+    assert runner.gpu_used_bytes() == 10
+    assert runner.gpu_used_bytes("GPU-missing") == 0
+
+
+def test_foreign_users_filter_selected_gpu(monkeypatch):
+    from wirl import lock, probe
+    monkeypatch.setattr(probe, "gpu_processes", lambda: [
+        {"pid": "42", "name": "other-server", "vram_mb": "1000", "gpu_uuid": "GPU-zero"},
+        {"pid": "43", "name": "selected-server", "vram_mb": "2000", "gpu_uuid": "GPU-one"}])
+    assert [p["pid"] for p in lock.foreign_gpu_users(gpu_uuid="GPU-one")] == [43]
+    assert len(lock.foreign_gpu_users()) == 2
+
+
+def test_launcher_exports_measured_gpu():
+    script = emit.launch_script(RunConfig("m", gpu_uuid="GPU-one"), "s")
+    assert "export CUDA_VISIBLE_DEVICES=GPU-one" in script
+    assert script.index("export CUDA_VISIBLE_DEVICES") < script.index("exec ")
+    assert "CUDA_VISIBLE_DEVICES" not in emit.launch_script(RunConfig("m"), "s")
+
+
+def test_run_config_measures_selected_gpu(monkeypatch):
+    from contextlib import contextmanager
+    from wirl import runner
+    seen = []
+
+    @contextmanager
+    def fake_server(*a, **kw):
+        yield 1.0
+
+    monkeypatch.setattr(runner, "server", fake_server)
+    monkeypatch.setattr(runner, "_generate", lambda *a: (10.0, 20.0, 1))
+    monkeypatch.setattr(runner, "gpu_used_bytes", lambda uuid=None: seen.append(uuid) or 123)
+    result = runner.run_config(RunConfig("m", gpu_uuid="GPU-one"), "s", reps=1, verbose=False)
+    assert result.ok and result.peak_vram == 123
+    assert seen and all(uuid == "GPU-one" for uuid in seen)

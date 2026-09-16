@@ -118,3 +118,29 @@ def test_clean_server_log_passes(tmp_path):
 
 def test_no_log_is_not_an_error():
     assert doctor.check_prompt_cache(None).status == doctor.OK
+
+
+def test_gpu_check_describes_selected_card():
+    gpus = [{"index": i, "name": f"card {i}", "vram_total": 24 * GiB,
+             "vram_free": 20 * GiB, "driver": "test"} for i in range(2)]
+    check = doctor.check_gpu_free(gpus, [], gpu_index=1)
+    assert "card 1" in check.detail and "card 0" not in check.detail
+
+
+def test_doctor_filters_contention_to_selected_gpu(monkeypatch):
+    from wirl import lock, probe
+    gpus = [{"index": i, "uuid": f"GPU-{i}", "name": f"card {i}",
+             "vram_total": 24 * GiB, "vram_free": 20 * GiB, "driver": "test"}
+            for i in range(2)]
+    monkeypatch.setattr(probe, "gpu_info", lambda: gpus)
+    monkeypatch.setattr(probe, "cpu_info", lambda: {})
+    monkeypatch.setattr(probe, "mem_info", _mem)
+    for name in ("check_llama_server", "check_isa", "check_swap", "check_dimm_population",
+                 "check_governor", "check_thp", "check_stale_autotune", "check_k_cache_quant",
+                 "check_prompt_cache"):
+        monkeypatch.setattr(doctor, name, lambda *a: doctor.Check("mock", doctor.OK, ""))
+    seen = []
+    monkeypatch.setattr(lock, "foreign_gpu_users", lambda **kw: seen.append(kw) or [])
+    checks = doctor.run_all(gpu_index=1)
+    assert seen == [{"gpu_uuid": "GPU-1"}]
+    assert "card 1" in next(c.detail for c in checks if c.name == "gpu-exclusive")

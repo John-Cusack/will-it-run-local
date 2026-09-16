@@ -56,7 +56,7 @@ def benchmark_lock(wait=False):
             os.close(fd)
 
 
-def foreign_gpu_users(min_mb=200, ignore_pids=()):
+def foreign_gpu_users(min_mb=200, ignore_pids=(), gpu_uuid=None):
     """Processes holding meaningful GPU memory, excluding our own.
 
     Desktop compositors and browsers take tens of MB and are harmless. An
@@ -66,6 +66,8 @@ def foreign_gpu_users(min_mb=200, ignore_pids=()):
     from .probe import gpu_processes
     out = []
     for p in gpu_processes():
+        if gpu_uuid is not None and p.get("gpu_uuid") != gpu_uuid:
+            continue
         try:
             mb = int(float(p["vram_mb"]))
             pid = int(p["pid"])

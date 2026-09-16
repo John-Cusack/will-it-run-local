@@ -205,6 +205,16 @@ passes `--n-cpu-moe`.
 
 ### 2.3 Measurements are wrong on machines with several GPUs
 
+**Status: complete.** UUIDs flow through discovery, auto/tune launches, VRAM
+reads, contention checks and emitted launchers; doctor accepts `--gpu`.
+Fourteen new cases cover parsers, process environment, selected VRAM/contention,
+launcher output, invalid/negative indices, auto/tune and doctor's selected card.
+The first eleven failed before the fix; plain `pytest -q`: 132 passed.
+
+**Refinement:** select by the reported physical `index`, rather than a list
+offset, including when discovery order differs. Auto's contention check is in
+`doctor.run_all`, so passing its GPU index applies the UUID filter there.
+
 **Problem.**
 
 - `RunConfig.argv` (`runner.py:48`) and `server()` (`runner.py:223`) never

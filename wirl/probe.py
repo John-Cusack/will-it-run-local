@@ -108,7 +108,7 @@ def gpu_info() -> list:
         return []
     fields = ("index,name,memory.total,memory.used,memory.free,compute_cap,"
               "driver_version,pcie.link.gen.current,pcie.link.width.current,"
-              "clocks.max.memory,power.limit")
+              "clocks.max.memory,power.limit,uuid")
     out = _run(["nvidia-smi", f"--query-gpu={fields}",
                 "--format=csv,noheader,nounits"])
     if not out:
@@ -116,7 +116,7 @@ def gpu_info() -> list:
     gpus = []
     for line in out.strip().splitlines():
         p = [x.strip() for x in line.split(",")]
-        if len(p) < 11:
+        if len(p) < 12:
             continue
 
         def num(x, cast=float):
@@ -134,6 +134,7 @@ def gpu_info() -> list:
             "compute_cap": p[5], "driver": p[6],
             "pcie_gen": num(p[7], int), "pcie_width": num(p[8], int),
             "mem_clock_mhz": num(p[9]), "power_limit_w": num(p[10]),
+            "uuid": p[11],
         })
     return gpus
 
@@ -142,15 +143,15 @@ def gpu_processes() -> list:
     """Anything already using the GPU. Benchmarking next to these is invalid."""
     if not shutil.which("nvidia-smi"):
         return []
-    out = _run(["nvidia-smi", "--query-compute-apps=pid,process_name,used_memory",
+    out = _run(["nvidia-smi", "--query-compute-apps=pid,process_name,used_memory,gpu_uuid",
                 "--format=csv,noheader,nounits"])
     if not out or not out.strip():
         return []
     procs = []
     for line in out.strip().splitlines():
         p = [x.strip() for x in line.split(",")]
-        if len(p) >= 3:
-            procs.append({"pid": p[0], "name": p[1], "vram_mb": p[2]})
+        if len(p) >= 4:
+            procs.append({"pid": p[0], "name": p[1], "vram_mb": p[2], "gpu_uuid": p[3]})
     return procs
 
 

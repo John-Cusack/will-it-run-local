@@ -36,9 +36,12 @@ def _bandwidth(args) -> tuple:
 
 def _gpu_choice(args):
     gpus = probe.gpu_info()
-    if not gpus:
+    if not gpus and args.gpu == 0:
         return None, 0, 0.0
-    g = gpus[args.gpu] if args.gpu < len(gpus) else gpus[0]
+    g = next((g for g in gpus if g["index"] == args.gpu), None)
+    if g is None:
+        available = ", ".join(f"{g['index']}: {g['name']}" for g in gpus) or "none"
+        sys.exit(f"error: GPU index {args.gpu} is not available; available GPUs: {available}")
     budget = args.vram * (1 << 30) if args.vram else g["vram_total"]
     bw = probe.gpu_bandwidth_hint(g) or 500e9
     return g, budget, bw
@@ -276,7 +279,7 @@ def cmd_auto(args):
     # ---- 2. pre-flight ---------------------------------------------------
     head("2. Pre-flight")
     checks = doctor.run_all(mc.total_bytes, 0, cache_type_k=args.cache_type_k,
-                            llama_server=args.llama_server)
+                            llama_server=args.llama_server, gpu_index=args.gpu)
     report.print_checks(checks, show_ok=False)
     blocking = [ch for ch in checks if ch.status == doctor.FAIL]
     if blocking and not args.force:
@@ -324,6 +327,7 @@ def cmd_auto(args):
 
     base = RunConfig(model=g.path, ctx=args.ctx, threads=args.threads,
                      cache_type_k=args.cache_type_k,
+                     gpu_uuid=gpu["uuid"],
                      draft_model=dg.path if dg else None,
                      draft_n_max=args.draft_n_max, port=args.port)
     log = search.SearchLog()
@@ -653,20 +657,20 @@ def cmd_find_draft(args):
 
 
 def cmd_doctor(args):
+    gpu, _, _ = _gpu_choice(args)
     model_bytes = gpu_bytes = 0
     if args.model:
         _, mc = _load(args.model)
         model_bytes = mc.total_bytes
         # Anything already resident on the GPU is not competing for RAM.
-        gpus = probe.gpu_info()
-        if gpus:
-            gpu_bytes = min(gpus[0]["vram_total"], model_bytes)
+        if gpu:
+            gpu_bytes = min(gpu["vram_total"], model_bytes)
     head("Pre-flight checks")
     checks = doctor.run_all(model_bytes or None, gpu_bytes,
                             cache_type_k=args.cache_type_k,
                             path=os.path.dirname(args.model) if args.model else ".",
                             llama_server=args.llama_server,
-                            server_log=args.server_log)
+                            server_log=args.server_log, gpu_index=args.gpu)
     report.print_checks(checks)
     fails = [c_ for c_ in checks if c_.status == "fail"]
     warns = [c_ for c_ in checks if c_.status == "warn"]
@@ -719,7 +723,8 @@ def cmd_tune(args):
     if args.draft:
         dg, dmc = _load(args.draft, "draft model")
 
-    foreign = foreign_gpu_users()
+    gpu, budget, bw_gpu = _gpu_choice(args)
+    foreign = foreign_gpu_users(gpu_uuid=gpu["uuid"] if gpu else None)
     if foreign and not args.force:
         print(c("  refusing to benchmark: other processes hold GPU memory:", report.RED))
         for p in foreign:
@@ -729,7 +734,6 @@ def cmd_tune(args):
              "genuinely want a contended number.")
         return 1
 
-    gpu, budget, bw_gpu = _gpu_choice(args)
     bw_cpu, _ = _bandwidth(args)
     moe = mc.is_moe
     knob = "--n-cpu-moe" if moe else "--n-gpu-layers"
@@ -748,6 +752,7 @@ def cmd_tune(args):
     cands = list(range(hi, lo - 1, -1) if moe else range(lo, hi + 1))
 
     base = RunConfig(model=g.path, ctx=args.ctx, threads=args.threads,
+                     gpu_uuid=gpu["uuid"] if gpu else None,
                      draft_model=dg.path if dg else None,
                      draft_n_max=args.draft_n_max, port=args.port)
 
@@ -953,6 +958,7 @@ def build_parser():
     sp.set_defaults(func=cmd_find_draft)
 
     sp = sub.add_parser("doctor", help="check for conditions that silently ruin results")
+    gpu_opts(sp)
     sp.add_argument("--model")
     sp.add_argument("--llama-server")
     sp.add_argument("--server-log",

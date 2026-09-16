@@ -530,8 +530,9 @@ itself:
 - **CPU-only estimates use one calibration.** `CPU_ONLY_DERATE` (0.70) comes
   from a single CPU-only measurement on the reference machine; verify the
   estimate on other CPUs.
-- **Single GPU only.** With several present it uses index 0 unless told
-  otherwise; multi-GPU splits are not modelled at all.
+- **Each run uses one GPU.** Choose it with `--gpu` (the `nvidia-smi` index,
+  default 0). llama-server and the emitted launcher are restricted to that
+  card by UUID. Splitting a model across GPUs is not modelled.
 - **The VRAM edge is found by whether the server starts, which is not the same
   as whether it fits.** llama.cpp allocates the KV cache lazily, so a context
   size can load happily and then run out of VRAM once a conversation actually

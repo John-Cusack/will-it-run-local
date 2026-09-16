@@ -256,3 +256,27 @@ def test_plan_falls_back_to_a_cpu_only_estimate(monkeypatch, capsys, moe_model):
     assert "CPU only:" in out
     # and it must not pretend the estimate is trustworthy
     assert "well below this" in out
+
+
+def test_auto_pins_selected_gpu(monkeypatch, tmp_path, moe_model):
+    from wirl import cli, doctor, lock, probe
+    from wirl.runner import RunResult
+    monkeypatch.setattr(cli, "find_server", lambda *a: "mock-server")
+    monkeypatch.setattr(lock, "LOCK_PATH", str(tmp_path / "lock"))
+    monkeypatch.setattr(probe, "cpu_info", lambda: {"model": "test", "physical": 64})
+    monkeypatch.setattr(probe, "gpu_info", lambda: [
+        {"index": 1, "uuid": "GPU-one", "name": "test", "vram_total": 24 << 30}])
+    checks, calls = [], []
+    monkeypatch.setattr(doctor, "run_all", lambda *a, **kw: checks.append(kw) or [])
+
+    def run(cfg, binary, **kw):
+        calls.append(cfg)
+        return RunResult(cfg, [10.0], [], 100, 1.0, True)
+
+    monkeypatch.setattr(search, "run_config", run)
+    out = tmp_path / "run.sh"
+    assert cli.main(["auto", moe_model, "--gpu", "1", "--mem-bandwidth", "20",
+                     "--no-depth", "--emit", str(out)]) == 0
+    assert checks[0]["gpu_index"] == 1
+    assert calls and all(c.gpu_uuid == "GPU-one" for c in calls)
+    assert "export CUDA_VISIBLE_DEVICES=GPU-one" in out.read_text()
