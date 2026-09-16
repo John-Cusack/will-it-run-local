@@ -76,3 +76,46 @@ def test_unsharded_path_passes_through(tmp_path):
     p = tmp_path / "m.gguf"
     p.write_bytes(b"GGUF")
     assert gguf.shard_paths(str(p)) == [str(p)]
+
+
+def test_remote_fetch_rejects_ignored_range_before_reading(monkeypatch):
+    import io
+    reads = []
+
+    class Response(io.BytesIO):
+        status = 200
+
+        def read(self, *a):
+            reads.append(a)
+            return super().read(*a)
+
+    response = Response(b"entire model")
+    monkeypatch.setattr(gguf.urllib.request, "urlopen", lambda *a, **kw: response)
+    reader = gguf._Reader("https://example.invalid/model.gguf")
+    with pytest.raises(ValueError, match="Range.*206.*200"):
+        reader._fetch(0, 5)
+    assert not reads and response.closed
+
+
+def test_remote_fetch_limits_partial_response(monkeypatch):
+    import io
+    reads, requests = [], []
+
+    class Response(io.BytesIO):
+        status = 206
+
+        def read(self, *a):
+            reads.append(a)
+            return super().read(*a)
+
+    response = Response(b"1234567890")
+
+    def opened(request, **kw):
+        requests.append(request)
+        return response
+
+    monkeypatch.setattr(gguf.urllib.request, "urlopen", opened)
+    reader = gguf._Reader("https://example.invalid/model.gguf")
+    assert reader._fetch(10, 5) == b"12345"
+    assert reads == [(5,)]
+    assert requests[0].get_header("Range") == "bytes=10-14"

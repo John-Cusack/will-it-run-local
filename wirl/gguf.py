@@ -53,7 +53,9 @@ class _Reader:
                      "User-Agent": USER_AGENT},
         )
         with urllib.request.urlopen(req, timeout=60) as r:
-            return r.read()
+            if r.status != 206:
+                raise ValueError(f"server did not honour HTTP Range: expected 206, got {r.status}")
+            return r.read(length)
 
     def read(self, n):
         if self.fh is not None:

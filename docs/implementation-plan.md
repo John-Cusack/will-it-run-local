@@ -441,6 +441,11 @@ existing lock file is opened, not replaced.
 
 ### 3.2 Remote header reads trust the server to honour Range (recommended before release)
 
+**Status: complete.** Reject non-206 responses before reading and cap each read
+at the requested length. Two fake-response tests failed before the fix and
+verify ignored Range rejection without a read, response closure, the Range
+header and bounded 206 reads. Plain `pytest -q`: 156 passed. Followed the plan.
+
 **Problem.** `_Reader._fetch` (`gguf.py:49`–`56`) sends a Range header and then
 reads the whole response. A server or proxy that ignores Range replies `200`
 with the entire file, and that gets read into memory: tens of GB.
