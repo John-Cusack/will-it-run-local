@@ -1,0 +1,1028 @@
+{
+  "host": {
+    "model": "AMD Ryzen 9 5950X 16-Core Processor",
+    "logical": 32,
+    "physical": 16,
+    "sockets": 1,
+    "numa_nodes": 1,
+    "isa": {
+      "avx2": true,
+      "fma": true,
+      "avx512f": false,
+      "avx512_bf16": false,
+      "amx_int8": false
+    },
+    "governor": "powersave"
+  },
+  "kernel": "6.14.0-37-generic",
+  "wheel": {
+    "name": "will_it_run_local-0.1.0-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+    "sha256": "36b77c53046c308d511a2e41262f7299d6f22f2bf6154322552ab9df34b56572"
+  },
+  "source_sha256": "bbad0058f2c61ac28a6d303f7ad271325a92e022463624598b91a583b7d46ad3",
+  "local_compiler": "cc (Ubuntu 11.5.0-1ubuntu1~24.04.1) 11.5.0",
+  "compile_flags": [
+    "-O2",
+    "-pthread"
+  ],
+  "criterion": "The prebuilt median must lie in the inclusive min/max range of the three locally compiled samples for each mode.",
+  "prebuilt_compiler_comments": [
+    "GCC: (GNU) 8.5.0 20210514 (Red Hat 8.5.0-28)",
+    "GCC: (GNU) 14.2.1 20250110 (Red Hat 14.2.1-11)"
+  ],
+  "binary_sha256": {
+    "prebuilt": "9edce06f42972726e7f9b0413c8317fd0f27f537b08a585ca15c3e52e0ec09c4",
+    "local": "7a247b217911fdf842cd50549807c451143b0658bfec63f3474279c4135ac43a"
+  },
+  "attempts": [
+    {
+      "parameters": {
+        "threads": 16,
+        "gib": 8,
+        "reps": 1,
+        "cores": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "before": {
+        "utc": "2026-09-16T15:06:46.512646+00:00",
+        "load_average": [
+          1.2890625,
+          1.380859375,
+          1.1474609375
+        ],
+        "memory": {
+          "total": 67337146368,
+          "available": 27057106944,
+          "swap_total": 8589930496,
+          "swap_free": 8585740288,
+          "swap_used": 4190208,
+          "edac_total": 0
+        },
+        "swap_activity": {
+          "pswpin": 100,
+          "pswpout": 804
+        },
+        "memory_pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=2436601\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=2412724"
+      },
+      "after": {
+        "utc": "2026-09-16T15:07:53.937653+00:00",
+        "load_average": [
+          2.66845703125,
+          1.84716796875,
+          1.330078125
+        ],
+        "memory": {
+          "total": 67337146368,
+          "available": 27367018496,
+          "swap_total": 8589930496,
+          "swap_free": 7838420992,
+          "swap_used": 751509504,
+          "edac_total": 0
+        },
+        "swap_activity": {
+          "pswpin": 31042,
+          "pswpout": 163154
+        },
+        "memory_pressure": "some avg10=0.01 avg60=0.36 avg300=0.16 total=3156669\nfull avg10=0.01 avg60=0.36 avg300=0.16 total=3127162"
+      },
+      "summary": {
+        "stream": {
+          "samples": {
+            "prebuilt": [
+              26.867642516882327,
+              28.353362133614997,
+              28.3631922603226
+            ],
+            "local": [
+              27.877088662149177,
+              28.45131142665037,
+              28.661394549288627
+            ]
+          },
+          "prebuilt_median": 28.353362133614997,
+          "local_median": 28.45131142665037,
+          "local_range": [
+            27.877088662149177,
+            28.661394549288627
+          ],
+          "local_spread_pct": 2.756659878970604,
+          "median_difference_pct": -0.3442698706099867,
+          "median_within_local_range": true,
+          "all_prebuilt_samples_within_local_range": false
+        },
+        "gather": {
+          "samples": {
+            "prebuilt": [
+              21.239082662446844,
+              22.15834764364772,
+              21.522904299602448
+            ],
+            "local": [
+              22.717162365917474,
+              22.215807720159727,
+              22.051105366922236
+            ]
+          },
+          "prebuilt_median": 21.522904299602448,
+          "local_median": 22.215807720159727,
+          "local_range": [
+            22.051105366922236,
+            22.717162365917474
+          ],
+          "local_spread_pct": 2.9981219111417885,
+          "median_difference_pct": -3.1189656900410787,
+          "median_within_local_range": false,
+          "all_prebuilt_samples_within_local_range": false
+        }
+      },
+      "swap_delta": {
+        "pswpin": 30942,
+        "pswpout": 162350
+      },
+      "status": "invalid for acceptance: swap activity; gather median outside local range",
+      "runs": [
+        {
+          "mode": "stream",
+          "probe": "prebuilt",
+          "run": 1,
+          "stdout": "stream 0 0.319713 8589934592\n",
+          "stderr": "",
+          "gb_per_second": 26.867642516882327,
+          "wall_seconds": 6.946195018012077,
+          "before_swap": {
+            "pswpin": 100,
+            "pswpout": 804
+          },
+          "after_swap": {
+            "pswpin": 476,
+            "pswpout": 117790
+          },
+          "before_available_bytes": 27057106944,
+          "after_available_bytes": 27811012608,
+          "before_load_average": [
+            1.2890625,
+            1.380859375,
+            1.1474609375
+          ],
+          "after_load_average": [
+            1.42626953125,
+            1.408203125,
+            1.15771484375
+          ]
+        },
+        {
+          "mode": "stream",
+          "probe": "local",
+          "run": 1,
+          "stdout": "stream 0 0.308136 8589934592\n",
+          "stderr": "",
+          "gb_per_second": 27.877088662149177,
+          "wall_seconds": 5.668441633984912,
+          "before_swap": {
+            "pswpin": 476,
+            "pswpout": 117790
+          },
+          "after_swap": {
+            "pswpin": 7313,
+            "pswpout": 121743
+          },
+          "before_available_bytes": 27810516992,
+          "after_available_bytes": 27414355968,
+          "before_load_average": [
+            1.42626953125,
+            1.408203125,
+            1.15771484375
+          ],
+          "after_load_average": [
+            1.5888671875,
+            1.44482421875,
+            1.1728515625
+          ]
+        },
+        {
+          "mode": "stream",
+          "probe": "prebuilt",
+          "run": 2,
+          "stdout": "stream 0 0.302960 8589934592\n",
+          "stderr": "",
+          "gb_per_second": 28.353362133614997,
+          "wall_seconds": 5.661212594015524,
+          "before_swap": {
+            "pswpin": 7313,
+            "pswpout": 121743
+          },
+          "after_swap": {
+            "pswpin": 13108,
+            "pswpout": 149608
+          },
+          "before_available_bytes": 27422285824,
+          "after_available_bytes": 27794612224,
+          "before_load_average": [
+            1.5888671875,
+            1.44482421875,
+            1.1728515625
+          ],
+          "after_load_average": [
+            3.2236328125,
+            1.7861328125,
+            1.28515625
+          ]
+        },
+        {
+          "mode": "stream",
+          "probe": "local",
+          "run": 2,
+          "stdout": "stream 0 0.301917 8589934592\n",
+          "stderr": "",
+          "gb_per_second": 28.45131142665037,
+          "wall_seconds": 5.596679367998149,
+          "before_swap": {
+            "pswpin": 13108,
+            "pswpout": 149608
+          },
+          "after_swap": {
+            "pswpin": 14003,
+            "pswpout": 149608
+          },
+          "before_available_bytes": 27792629760,
+          "after_available_bytes": 27436679168,
+          "before_load_average": [
+            3.2236328125,
+            1.7861328125,
+            1.28515625
+          ],
+          "after_load_average": [
+            3.20556640625,
+            1.806640625,
+            1.29443359375
+          ]
+        },
+        {
+          "mode": "stream",
+          "probe": "prebuilt",
+          "run": 3,
+          "stdout": "stream 0 0.302855 8589934592\n",
+          "stderr": "",
+          "gb_per_second": 28.3631922603226,
+          "wall_seconds": 5.647917780966964,
+          "before_swap": {
+            "pswpin": 14003,
+            "pswpout": 149608
+          },
+          "after_swap": {
+            "pswpin": 14888,
+            "pswpout": 149608
+          },
+          "before_available_bytes": 27436679168,
+          "after_available_bytes": 26068529152,
+          "before_load_average": [
+            3.20556640625,
+            1.806640625,
+            1.29443359375
+          ],
+          "after_load_average": [
+            3.10888671875,
+            1.81005859375,
+            1.29833984375
+          ]
+        },
+        {
+          "mode": "stream",
+          "probe": "local",
+          "run": 3,
+          "stdout": "stream 0 0.299704 8589934592\n",
+          "stderr": "",
+          "gb_per_second": 28.661394549288627,
+          "wall_seconds": 5.631899022962898,
+          "before_swap": {
+            "pswpin": 14888,
+            "pswpout": 149608
+          },
+          "after_swap": {
+            "pswpin": 17788,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 26068529152,
+          "after_available_bytes": 27424645120,
+          "before_load_average": [
+            3.10888671875,
+            1.81005859375,
+            1.29833984375
+          ],
+          "after_load_average": [
+            3.02001953125,
+            1.8134765625,
+            1.30224609375
+          ]
+        },
+        {
+          "mode": "gather",
+          "probe": "prebuilt",
+          "run": 1,
+          "stdout": "gather 0 0.151665 3221225472\n",
+          "stderr": "",
+          "gb_per_second": 21.239082662446844,
+          "wall_seconds": 5.454502940992825,
+          "before_swap": {
+            "pswpin": 17788,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 18226,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 27424645120,
+          "after_available_bytes": 26657173504,
+          "before_load_average": [
+            3.02001953125,
+            1.8134765625,
+            1.30224609375
+          ],
+          "after_load_average": [
+            2.93798828125,
+            1.81689453125,
+            1.30615234375
+          ]
+        },
+        {
+          "mode": "gather",
+          "probe": "local",
+          "run": 1,
+          "stdout": "gather 0 0.141797 3221225472\n",
+          "stderr": "",
+          "gb_per_second": 22.717162365917474,
+          "wall_seconds": 5.354166849981993,
+          "before_swap": {
+            "pswpin": 18226,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 22824,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 26657173504,
+          "after_available_bytes": 27269304320,
+          "before_load_average": [
+            2.93798828125,
+            1.81689453125,
+            1.30615234375
+          ],
+          "after_load_average": [
+            2.86279296875,
+            1.8203125,
+            1.31005859375
+          ]
+        },
+        {
+          "mode": "gather",
+          "probe": "prebuilt",
+          "run": 2,
+          "stdout": "gather 0 0.145373 3221225472\n",
+          "stderr": "",
+          "gb_per_second": 22.15834764364772,
+          "wall_seconds": 5.398184918973129,
+          "before_swap": {
+            "pswpin": 22824,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 25903,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 27269304320,
+          "after_available_bytes": 27657588736,
+          "before_load_average": [
+            2.86279296875,
+            1.8203125,
+            1.31005859375
+          ],
+          "after_load_average": [
+            2.9541015625,
+            1.85693359375,
+            1.32470703125
+          ]
+        },
+        {
+          "mode": "gather",
+          "probe": "local",
+          "run": 2,
+          "stdout": "gather 0 0.144997 3221225472\n",
+          "stderr": "",
+          "gb_per_second": 22.215807720159727,
+          "wall_seconds": 5.333037980017252,
+          "before_swap": {
+            "pswpin": 25903,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 30422,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 27657588736,
+          "after_available_bytes": 27284299776,
+          "before_load_average": [
+            2.9541015625,
+            1.85693359375,
+            1.32470703125
+          ],
+          "after_load_average": [
+            2.79736328125,
+            1.84228515625,
+            1.32275390625
+          ]
+        },
+        {
+          "mode": "gather",
+          "probe": "prebuilt",
+          "run": 3,
+          "stdout": "gather 0 0.149665 3221225472\n",
+          "stderr": "",
+          "gb_per_second": 21.522904299602448,
+          "wall_seconds": 5.38907327898778,
+          "before_swap": {
+            "pswpin": 30422,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 30977,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 27284299776,
+          "after_available_bytes": 27333709824,
+          "before_load_average": [
+            2.79736328125,
+            1.84228515625,
+            1.32275390625
+          ],
+          "after_load_average": [
+            2.81396484375,
+            1.86181640625,
+            1.33203125
+          ]
+        },
+        {
+          "mode": "gather",
+          "probe": "local",
+          "run": 3,
+          "stdout": "gather 0 0.146080 3221225472\n",
+          "stderr": "",
+          "gb_per_second": 22.051105366922236,
+          "wall_seconds": 5.332912810030393,
+          "before_swap": {
+            "pswpin": 30977,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 31042,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 27333709824,
+          "after_available_bytes": 27367018496,
+          "before_load_average": [
+            2.81396484375,
+            1.86181640625,
+            1.33203125
+          ],
+          "after_load_average": [
+            2.66845703125,
+            1.84716796875,
+            1.330078125
+          ]
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "threads": 16,
+        "gib": 2,
+        "reps": 1,
+        "cores": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "before": {
+        "utc": "2026-09-16T15:08:32.830565+00:00",
+        "load_average": [
+          1.52685546875,
+          1.65966796875,
+          1.28759765625
+        ],
+        "memory": {
+          "total": 67337146368,
+          "available": 27935961088,
+          "swap_total": 8589930496,
+          "swap_free": 7838892032,
+          "swap_used": 751038464,
+          "edac_total": 0
+        },
+        "swap_activity": {
+          "pswpin": 36172,
+          "pswpout": 163154
+        },
+        "memory_pressure": "some avg10=0.00 avg60=0.18 avg300=0.13 total=3156680\nfull avg10=0.00 avg60=0.18 avg300=0.13 total=3127172"
+      },
+      "after": {
+        "utc": "2026-09-16T15:08:51.019316+00:00",
+        "load_average": [
+          1.87255859375,
+          1.73095703125,
+          1.3193359375
+        ],
+        "memory": {
+          "total": 67337146368,
+          "available": 27449036800,
+          "swap_total": 8589930496,
+          "swap_free": 7839019008,
+          "swap_used": 750911488,
+          "edac_total": 0
+        },
+        "swap_activity": {
+          "pswpin": 36739,
+          "pswpout": 163154
+        },
+        "memory_pressure": "some avg10=0.00 avg60=0.13 avg300=0.13 total=3156680\nfull avg10=0.00 avg60=0.13 avg300=0.13 total=3127172"
+      },
+      "summary": {
+        "stream": {
+          "samples": {
+            "prebuilt": [
+              28.09665647896169,
+              28.379590960750626,
+              27.716619101703667
+            ],
+            "local": [
+              27.87527937797739,
+              28.329797606954873,
+              27.967124840465715
+            ]
+          },
+          "prebuilt_median": 28.09665647896169,
+          "local_median": 27.967124840465715,
+          "local_range": [
+            27.87527937797739,
+            28.329797606954873
+          ],
+          "local_spread_pct": 1.6251875427675015,
+          "median_difference_pct": 0.4631567929662775,
+          "median_within_local_range": true,
+          "all_prebuilt_samples_within_local_range": false
+        },
+        "gather": {
+          "samples": {
+            "prebuilt": [
+              23.19046724692771,
+              22.087090632328138,
+              22.316155544009145
+            ],
+            "local": [
+              22.009370730474117,
+              23.112594958779088,
+              21.746963483051246
+            ]
+          },
+          "prebuilt_median": 22.316155544009145,
+          "local_median": 22.009370730474117,
+          "local_range": [
+            21.746963483051246,
+            23.112594958779088
+          ],
+          "local_spread_pct": 6.2047729235483855,
+          "median_difference_pct": 1.393882711559103,
+          "median_within_local_range": true,
+          "all_prebuilt_samples_within_local_range": false
+        }
+      },
+      "swap_delta": {
+        "pswpin": 567,
+        "pswpout": 0
+      },
+      "status": "both median range checks pass; shared-host page-ins prevent an idle-machine acceptance claim",
+      "runs": [
+        {
+          "mode": "stream",
+          "probe": "prebuilt",
+          "run": 1,
+          "stdout": "stream 0 0.076432 2147483648\n",
+          "stderr": "",
+          "gb_per_second": 28.09665647896169,
+          "wall_seconds": 1.5359087259857915,
+          "before_swap": {
+            "pswpin": 36172,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 36173,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 27935961088,
+          "after_available_bytes": 27196088320,
+          "before_load_average": [
+            1.52685546875,
+            1.65966796875,
+            1.28759765625
+          ],
+          "after_load_average": [
+            1.64501953125,
+            1.68212890625,
+            1.296875
+          ]
+        },
+        {
+          "mode": "stream",
+          "probe": "local",
+          "run": 1,
+          "stdout": "stream 0 0.077039 2147483648\n",
+          "stderr": "",
+          "gb_per_second": 27.87527937797739,
+          "wall_seconds": 1.4727616849704646,
+          "before_swap": {
+            "pswpin": 36173,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 36178,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 27196088320,
+          "after_available_bytes": 26899251200,
+          "before_load_average": [
+            1.64501953125,
+            1.68212890625,
+            1.296875
+          ],
+          "after_load_average": [
+            1.64501953125,
+            1.68212890625,
+            1.296875
+          ]
+        },
+        {
+          "mode": "stream",
+          "probe": "prebuilt",
+          "run": 2,
+          "stdout": "stream 0 0.075670 2147483648\n",
+          "stderr": "",
+          "gb_per_second": 28.379590960750626,
+          "wall_seconds": 1.467415353981778,
+          "before_swap": {
+            "pswpin": 36178,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 36430,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 26899251200,
+          "after_available_bytes": 27106791424,
+          "before_load_average": [
+            1.64501953125,
+            1.68212890625,
+            1.296875
+          ],
+          "after_load_average": [
+            1.64501953125,
+            1.68212890625,
+            1.296875
+          ]
+        },
+        {
+          "mode": "stream",
+          "probe": "local",
+          "run": 2,
+          "stdout": "stream 0 0.075803 2147483648\n",
+          "stderr": "",
+          "gb_per_second": 28.329797606954873,
+          "wall_seconds": 1.4701068609720096,
+          "before_swap": {
+            "pswpin": 36430,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 36430,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 27106791424,
+          "after_available_bytes": 27115937792,
+          "before_load_average": [
+            1.64501953125,
+            1.68212890625,
+            1.296875
+          ],
+          "after_load_average": [
+            1.64501953125,
+            1.68212890625,
+            1.296875
+          ]
+        },
+        {
+          "mode": "stream",
+          "probe": "prebuilt",
+          "run": 3,
+          "stdout": "stream 0 0.077480 2147483648\n",
+          "stderr": "",
+          "gb_per_second": 27.716619101703667,
+          "wall_seconds": 1.4556048420490697,
+          "before_swap": {
+            "pswpin": 36430,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 36439,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 27115937792,
+          "after_available_bytes": 27039367168,
+          "before_load_average": [
+            1.64501953125,
+            1.68212890625,
+            1.296875
+          ],
+          "after_load_average": [
+            1.75390625,
+            1.7041015625,
+            1.30615234375
+          ]
+        },
+        {
+          "mode": "stream",
+          "probe": "local",
+          "run": 3,
+          "stdout": "stream 0 0.076786 2147483648\n",
+          "stderr": "",
+          "gb_per_second": 27.967124840465715,
+          "wall_seconds": 1.4677539379918016,
+          "before_swap": {
+            "pswpin": 36439,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 36462,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 27039367168,
+          "after_available_bytes": 26957234176,
+          "before_load_average": [
+            1.75390625,
+            1.7041015625,
+            1.30615234375
+          ],
+          "after_load_average": [
+            1.75390625,
+            1.7041015625,
+            1.30615234375
+          ]
+        },
+        {
+          "mode": "gather",
+          "probe": "prebuilt",
+          "run": 1,
+          "stdout": "gather 0 0.138903 3221225472\n",
+          "stderr": "",
+          "gb_per_second": 23.19046724692771,
+          "wall_seconds": 1.5322067189845257,
+          "before_swap": {
+            "pswpin": 36462,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 36463,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 26957234176,
+          "after_available_bytes": 27047165952,
+          "before_load_average": [
+            1.75390625,
+            1.7041015625,
+            1.30615234375
+          ],
+          "after_load_average": [
+            1.75390625,
+            1.7041015625,
+            1.30615234375
+          ]
+        },
+        {
+          "mode": "gather",
+          "probe": "local",
+          "run": 1,
+          "stdout": "gather 0 0.146357 3221225472\n",
+          "stderr": "",
+          "gb_per_second": 22.009370730474117,
+          "wall_seconds": 1.5394322639913298,
+          "before_swap": {
+            "pswpin": 36463,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 36533,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 27047165952,
+          "after_available_bytes": 27328454656,
+          "before_load_average": [
+            1.75390625,
+            1.7041015625,
+            1.30615234375
+          ],
+          "after_load_average": [
+            1.77392578125,
+            1.70947265625,
+            1.31005859375
+          ]
+        },
+        {
+          "mode": "gather",
+          "probe": "prebuilt",
+          "run": 2,
+          "stdout": "gather 0 0.145842 3221225472\n",
+          "stderr": "",
+          "gb_per_second": 22.087090632328138,
+          "wall_seconds": 1.554995913989842,
+          "before_swap": {
+            "pswpin": 36533,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 36533,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 27328454656,
+          "after_available_bytes": 27128823808,
+          "before_load_average": [
+            1.77392578125,
+            1.70947265625,
+            1.31005859375
+          ],
+          "after_load_average": [
+            1.77392578125,
+            1.70947265625,
+            1.31005859375
+          ]
+        },
+        {
+          "mode": "gather",
+          "probe": "local",
+          "run": 2,
+          "stdout": "gather 0 0.139371 3221225472\n",
+          "stderr": "",
+          "gb_per_second": 23.112594958779088,
+          "wall_seconds": 1.543801916996017,
+          "before_swap": {
+            "pswpin": 36533,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 36624,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 27128823808,
+          "after_available_bytes": 26927738880,
+          "before_load_average": [
+            1.77392578125,
+            1.70947265625,
+            1.31005859375
+          ],
+          "after_load_average": [
+            1.77392578125,
+            1.70947265625,
+            1.31005859375
+          ]
+        },
+        {
+          "mode": "gather",
+          "probe": "prebuilt",
+          "run": 3,
+          "stdout": "gather 0 0.144345 3221225472\n",
+          "stderr": "",
+          "gb_per_second": 22.316155544009145,
+          "wall_seconds": 1.5546877880115062,
+          "before_swap": {
+            "pswpin": 36624,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 36704,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 26927738880,
+          "after_available_bytes": 27216211968,
+          "before_load_average": [
+            1.77392578125,
+            1.70947265625,
+            1.31005859375
+          ],
+          "after_load_average": [
+            1.87255859375,
+            1.73095703125,
+            1.3193359375
+          ]
+        },
+        {
+          "mode": "gather",
+          "probe": "local",
+          "run": 3,
+          "stdout": "gather 0 0.148123 3221225472\n",
+          "stderr": "",
+          "gb_per_second": 21.746963483051246,
+          "wall_seconds": 1.5830667429836467,
+          "before_swap": {
+            "pswpin": 36704,
+            "pswpout": 163154
+          },
+          "after_swap": {
+            "pswpin": 36739,
+            "pswpout": 163154
+          },
+          "before_available_bytes": 27216211968,
+          "after_available_bytes": 27449036800,
+          "before_load_average": [
+            1.87255859375,
+            1.73095703125,
+            1.3193359375
+          ],
+          "after_load_average": [
+            1.87255859375,
+            1.73095703125,
+            1.3193359375
+          ]
+        }
+      ]
+    }
+  ],
+  "compiler_free_container": {
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "--network",
+      "none",
+      "-v",
+      "/tmp/wirl-coverage.2IGSSK/wheels:/wheels:ro",
+      "-v",
+      "/home/john/repos/will-it-run-local/tools:/checks:ro",
+      "python:3.12-slim-bookworm",
+      "sh",
+      "-eu",
+      "-c",
+      "python -m pip install --no-index --no-deps /wheels/*.whl\npython -c 'import shutil; assert not any(shutil.which(cc) for cc in (\"cc\", \"gcc\", \"clang\")); print(\"cc/gcc/clang absent\")'\npython /checks/check_installed_probe.py --measure"
+    ],
+    "image_id": "sha256:59bf1d95c965f12dfc14afaf5af778fc1dbe5b372bd5c281645fc34d4c75d4e7",
+    "before_utc": "2026-09-16T15:09:12.424012+00:00",
+    "before_swap": {
+      "pswpin": 37315,
+      "pswpout": 163154
+    },
+    "parameters": {
+      "threads": 1,
+      "gib": 1,
+      "reps": 1
+    },
+    "stdout": "Processing /wheels/will_it_run_local-0.1.0-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl\nInstalling collected packages: will-it-run-local\nSuccessfully installed will-it-run-local-0.1.0\ncc/gcc/clang absent\nprebuilt probe starts without a compiler: /usr/local/lib/python3.12/site-packages/wirl/_bin/membw\nstream: 17.42 GB/s\ngather: 4.38 GB/s\n",
+    "stderr": "WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.\n",
+    "returncode": 0,
+    "after_utc": "2026-09-16T15:09:16.156046+00:00",
+    "after_swap": {
+      "pswpin": 37479,
+      "pswpout": 163154
+    },
+    "swap_delta": {
+      "pswpin": 164,
+      "pswpout": 0
+    }
+  },
+  "remaining_acceptance": [
+    "Idle EPYC 7B12 reference-machine comparison",
+    "Native aarch64 wheel execution and remote CI"
+  ]
+}

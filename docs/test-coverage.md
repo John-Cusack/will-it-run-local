@@ -77,9 +77,18 @@ mocked, including in negative controls.
 
 ## Still required outside Python coverage
 
-Phase 4's native ARM execution, reference-machine alternating prebuilt/source
-bandwidth comparison and compiler-free container measurements remain acceptance
-checks. The CI workflow implements the isolated-runner/container checks, but
-has not been pushed or run remotely. Local wheel installation and usage-path
-checks allocate no benchmark buffers. PyPI/GitHub setup, tags and publication
-are also pending under the earlier release restriction.
+The user authorised the real Phase 4 bandwidth checks. The installed wheel
+successfully measures stream and gather in a network-disabled container with
+no compiler. Three alternating launches per probe per mode were also recorded
+on the available Ryzen 5950X host. The 8 GiB attempt detected swapping and
+failed gather's median comparison; the 2 GiB repeat passes both median range
+checks with no new swap-outs, but concurrent page-ins and the differing host
+leave idle reference-machine acceptance pending. Every-sample containment
+fails and is recorded separately. All samples and the method are retained in
+[`phase4-bandwidth-acceptance.md`](phase4-bandwidth-acceptance.md).
+
+Native ARM execution and remote CI also remain pending. The workflow implements
+the isolated-runner/container checks, but has not been pushed or run remotely.
+PyPI/GitHub setup, tags and publication remain pending under the earlier release
+restriction. These manual C integration checks do not change Python coverage
+or make pytest depend on a compiler, hardware measurements or the network.

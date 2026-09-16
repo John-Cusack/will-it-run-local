@@ -26,9 +26,11 @@ are documented by [auditwheel](https://github.com/pypa/auditwheel) and
 GitHub documents the native
 [`ubuntu-24.04-arm` runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 
-ARM execution and the alternating reference-machine bandwidth comparison
-remain acceptance checks. No ARM runner is available locally, and the user has
-not lifted the restriction on real bandwidth benchmarks.
+ARM execution and the idle reference-machine comparison remain acceptance
+checks. The user subsequently authorised real bandwidth benchmarks; the
+available host differs from the reference inventory. Results and remaining
+checks are recorded in
+[`phase4-bandwidth-acceptance.md`](phase4-bandwidth-acceptance.md).
 
 ## Actual setuptools/cibuildwheel build
 
@@ -62,5 +64,7 @@ The default checker executes only the C program's argument-error path, which
 returns before any allocation. The built wheel installs and starts that path
 in a network-disabled `python:3.12-slim-bookworm` container, with actual compiler
 absence checked separately. CI uses `--measure` on isolated native runners,
-including a compiler-free container, to exercise both kernels. Those CI runs
-and the reference-machine comparison are still pending.
+including a compiler-free container, to exercise both kernels. The authorised
+local follow-up now passes the actual compiler-free container measurements and
+records alternating host comparisons. The idle EPYC reference comparison,
+native ARM execution and remote CI runs remain pending.

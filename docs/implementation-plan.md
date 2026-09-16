@@ -14,10 +14,11 @@ reference machine. Those are exactly the people PyPI brings.
 ## Follow-up scope (2026-09-16)
 
 The user authorised continuing the remaining phases. Phase 4 is now active.
-The earlier restrictions on real hardware benchmarks, llama-server/service
-operations, pushing and tagging remain in force. Implement and test the local
-packaging/release preparation, and leave the hardware acceptance measurements
-and external account setup explicitly pending.
+The user subsequently authorised the bandwidth acceptance tests. Run those
+measurements without changing existing services. The restrictions on
+llama-server/service operations, auto/tune runs, pushing, tagging and external
+account setup remain in force. Record the actual host inventory rather than
+assuming it matches the documented reference machine.
 
 **Coverage status: complete for the Python package.** The follow-up adds 166
 tests/cases, bringing the suite to 353 passing tests. Every `wirl` module has
@@ -697,7 +698,7 @@ pushed or tagged. The execution incident is recorded under 3.4.
 
 ## Phase 4: prebuilt bandwidth probe in platform wheels
 
-**Status: implementation complete; hardware/ARM acceptance pending.** Added
+**Status: implementation and compiler-free measurements complete; reference/ARM acceptance pending.** Added
 Linux-only build hooks compiling the unchanged C source with `-O2 -pthread`,
 Python-independent platform wheel tags, packaged-probe selection, a source-only
 sdist, and native x86_64/aarch64 cibuildwheel CI. The release workflow collects
@@ -737,12 +738,35 @@ source for the existing CI check; normal calls prefer the packaged executable.
 The fallback to numpy belongs to `measure`, preserving the existing public
 path-or-None result of `build_probe`.
 
-**Done-when checks still pending:** native ARM execution and the alternating
-reference-machine bandwidth comparison (three runs per probe per mode), plus
-the actual compiler-free container measurements in CI. No ARM runner is
-available locally. The earlier prohibition on real bandwidth runs still
-applies here, so the local container check deliberately exercises usage only.
-Do not claim Phase 4 fully accepted until those measurements pass.
+**Bandwidth follow-up:** the user authorised real measurements. Three
+alternating launches per binary per mode ran on the available Ryzen 5950X
+host. The initial default 8 GiB attempt recorded swapping and failed gather's
+median comparison, so it is invalid for acceptance and retained in the results.
+A 2 GiB repeat passes both prebuilt-median/local-range comparisons with no new
+swap-outs, but concurrent page-ins and the differing host prevent a full
+reference-machine acceptance claim. Every-sample containment fails in both
+attempts; it is reported separately from the predeclared median criterion.
+The network-disabled compiler-free container successfully measures stream
+(17.42 GB/s) and gather (4.38 GB/s), passing that Done-when check.
+
+**Measurement departures:** detected 16 Ryzen cores and 62.71 GiB RAM, rather
+than assuming the prompt's 64-core EPYC reference inventory. Reduced the buffer
+only for the second comparison after observing memory pressure; kept the
+runtime defaults, C kernels and published figures unchanged. Used an explicitly
+declared median-within-local-range interpretation, and also retained the
+stricter every-sample check. Full method and all raw samples/counters are in
+`docs/phase4-bandwidth-acceptance.md` and its linked JSON results.
+
+**Done-when checks still pending:** the idle EPYC reference-machine comparison
+and native ARM execution. No ARM runner is available locally. Remote CI has
+not run; no service operations, tags or pushes were performed. Do not claim
+Phase 4 fully accepted until the remaining measurements pass.
+
+**Follow-up verification:** plain `pytest -q` from the repository root passes
+all 353 tests on Python 3.9.25, 3.12.3 and 3.14.2 in the existing throwaway
+development venvs. Validated the recorded raw samples, alternating order,
+source identity, range checks and successful compiler-free container output.
+No unit tests or runtime code changed; these are manual integration results.
 
 **Start when** issues report "no C compiler", or before promoting the tool to
 people who don't build llama.cpp themselves. People running llama.cpp from
