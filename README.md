@@ -582,11 +582,14 @@ every run rather than cached. That CPU is being replaced.
 ```bash
 pip install -e '.[dev]'
 pytest                    # no model files or GPU required
+pytest -q --cov=wirl --cov-branch --cov-report=term-missing
 ```
 
 Tests use synthetic GGUFs built in-process and mock every server launch. The regression tests in
 `tests/test_predict.py` assert the predictor still reproduces the measurements
 above, so a change that looks better on paper but drifts from reality fails.
+Coverage gaps and the work required to close them are tracked in
+[`docs/test-coverage.md`](docs/test-coverage.md).
 
 The GGML type table in `wirl/ggml_types.py` is generated from llama.cpp itself
 via `tools/dump_ggml_types.c` rather than copied from documentation — deprecated

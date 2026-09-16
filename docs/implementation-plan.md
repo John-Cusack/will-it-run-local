@@ -11,6 +11,20 @@ Publish `will-it-run-local` on PyPI as a command-line tool, installed with
 Before the first release, fix the bugs that only appear on hardware unlike the
 reference machine. Those are exactly the people PyPI brings.
 
+## Follow-up scope (2026-09-16)
+
+The user authorised continuing the remaining phases. Phase 4 is now active.
+The earlier restrictions on real hardware benchmarks, llama-server/service
+operations, pushing and tagging remain in force. Implement and test the local
+packaging/release preparation, and leave the hardware acceptance measurements
+and external account setup explicitly pending.
+
+**Coverage status: measured, not 100%.** Phases 1–3 have 174 passing tests;
+the full Python package has 68.45% line and 53.03% branch coverage. Added
+development-only coverage tooling and a concrete gap inventory in
+`docs/test-coverage.md`. Full line/branch coverage is a separate outstanding
+workstream; no paths are excluded to inflate the result.
+
 ## Decisions
 
 | decision | why |
