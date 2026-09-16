@@ -95,3 +95,9 @@ def test_tune_selects_physical_gpu(monkeypatch, moe_model, tune_calls):
     assert cli.main(["tune", moe_model, "--gpu", "1", "--mem-bandwidth", "20"]) == 0
     assert seen == [{"gpu_uuid": "GPU-one"}]
     assert all(c.gpu_uuid == "GPU-one" for c in tune_calls)
+
+
+@pytest.mark.parametrize("physical,expected", [(64, [24, 32, 48, 64]),
+                                             (16, [6, 8, 12, 16]), (1, [1])])
+def test_thread_counts_scale_to_machine(physical, expected):
+    assert tune.thread_counts(physical) == expected

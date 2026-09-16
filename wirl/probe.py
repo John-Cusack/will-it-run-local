@@ -31,6 +31,54 @@ def _run(cmd, timeout=20):
         return None
 
 
+def parse_cpulist(text: str) -> list:
+    cpus = set()
+    for part in text.split(",") if text.strip() else []:
+        ends = part.strip().split("-")
+        start, end = int(ends[0]), int(ends[-1])
+        if len(ends) > 2 or start < 0 or end < start:
+            raise ValueError(f"invalid CPU list: {text}")
+        cpus.update(range(start, end + 1))
+    return sorted(cpus)
+
+
+def format_cpulist(cpus) -> str:
+    ordered = sorted(set(cpus))
+    ranges = []
+    i = 0
+    while i < len(ordered):
+        start = end = ordered[i]
+        i += 1
+        while i < len(ordered) and ordered[i] == end + 1:
+            end = ordered[i]
+            i += 1
+        ranges.append(str(start) if start == end else f"{start}-{end}")
+    return ",".join(ranges)
+
+
+def physical_core_cpus() -> list | None:
+    """One allowed logical CPU per core, without guessing sibling numbering."""
+    try:
+        allowed = sorted(os.sched_getaffinity(0))
+        seen, cpus = set(), []
+        for cpu in allowed:
+            base = f"/sys/devices/system/cpu/cpu{cpu}/topology"
+            text = _read(f"{base}/core_cpus_list")
+            if text is None:
+                text = _read(f"{base}/thread_siblings_list")
+            if text is None:
+                return None
+            siblings = set(parse_cpulist(text))
+            if cpu not in siblings:
+                return None
+            if cpu not in seen:
+                cpus.append(cpu)
+                seen.update(siblings)
+        return cpus
+    except (AttributeError, OSError, ValueError):
+        return None
+
+
 def cpu_info() -> dict:
     """Physical vs logical cores, ISA features, NUMA topology."""
     info = {"model": None, "logical": os.cpu_count() or 0, "physical": None,

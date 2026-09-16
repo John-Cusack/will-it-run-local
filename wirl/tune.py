@@ -70,6 +70,11 @@ def sweep_draft_depth(base: RunConfig, binary, depths=(1, 2, 3), reps=3,
     return results
 
 
+def thread_counts(physical):
+    # Preserve the measured 24/32/48/64 sweep on the 64-core reference machine.
+    return sorted({max(1, round(physical * f)) for f in (0.375, 0.5, 0.75, 1.0)})
+
+
 def sweep_threads(base: RunConfig, binary, counts, reps=3, n_tokens=400,
                   log_dir=None) -> list:
     """Sweep thread count.

@@ -283,6 +283,17 @@ for GPU 1 only, and the emitted launcher runs on the same card.
 
 ### 2.4 The launcher's CPU pinning is wrong on many desktop CPUs
 
+**Status: complete.** Launchers use an explicit affinity-aware sibling list
+and omit pinning when topology is unavailable. Sweeps scale by the specified
+fractions, preserving 24/32/48/64 on the reference machine. Twelve new cases
+cover CPU-list round trips, server/hybrid/limited/older/missing topology,
+launcher pinning and 64/16/1-core counts; these and the updated signature test
+failed before the fix. Plain `pytest -q`: 144 passed.
+
+**Refinement:** the thread-count expression is in `tune.thread_counts` so its
+reference-machine behaviour can be tested directly. The existing launcher
+test now supplies CPU IDs, since core count alone cannot identify siblings.
+
 **Problem.** `emit.launch_script` writes `taskset -c 0-{physical_cores - 1}`
 (`emit.py:22`), which assumes hyperthreads are numbered after every physical
 core. That holds on the reference EPYC, where core N's second thread is CPU

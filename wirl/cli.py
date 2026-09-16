@@ -377,7 +377,7 @@ def cmd_auto(args):
                          "If it is flat, that is the finding.")
                     print()
                     b3 = copy.copy(max(ok, key=lambda r: r.mean).config)
-                    counts = sorted({24, 32, 48, cpu["physical"]})
+                    counts = tune.thread_counts(cpu["physical"])
                     results += tune.sweep_threads(
                         b3, binary, counts, reps=args.reps,
                         n_tokens=args.tokens, log_dir=args.log_dir)
@@ -475,7 +475,7 @@ def cmd_auto(args):
              f"VRAM boundary found empirically at --n-cpu-moe {edge}.\n"
              f"Measured RAM bandwidth at the time: {bw_cpu/1e9:.0f} GB/s.")
     emit.write(out, emit.launch_script(cfg, binary,
-                                       physical_cores=cpu["physical"],
+                                       cpus=probe.physical_core_cpus(),
                                        extra_comment=notes), 0o755)
     print(f"  wrote launch script: {out}")
     unit_path = out + ".service"
@@ -814,7 +814,7 @@ def cmd_tune(args):
                  f"Roofline for this model on this machine was "
                  f"{best.tps:.2f} tok/s at {bw_cpu / 1e9:.0f} GB/s measured RAM bandwidth.")
         script = emit.launch_script(cfg, binary,
-                                    physical_cores=probe.cpu_info()["physical"],
+                                    cpus=probe.physical_core_cpus(),
                                     extra_comment=notes)
         p = emit.write(args.emit, script, 0o755)
         print(f"  wrote launch script: {p}")

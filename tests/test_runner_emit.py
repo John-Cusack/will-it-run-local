@@ -26,10 +26,16 @@ def test_draft_flags_only_appear_with_a_draft_model():
 
 def test_launch_script_pins_to_physical_cores():
     cfg = RunConfig(model="/m.gguf", n_cpu_moe=43)
-    s = emit.launch_script(cfg, "/bin/llama-server", physical_cores=64)
+    s = emit.launch_script(cfg, "/bin/llama-server", cpus=list(range(64)))
     assert "taskset -c 0-63" in s
     assert s.startswith("#!/usr/bin/env bash")
     assert "--n-cpu-moe 43" in s
+
+
+def test_launch_script_uses_explicit_topology_or_no_pinning():
+    cfg = RunConfig("m")
+    assert "taskset -c 0,2,4,16-19" in emit.launch_script(cfg, "s", cpus=[0, 2, 4, 16, 17, 18, 19])
+    assert "taskset" not in emit.launch_script(cfg, "s")
 
 
 def test_launch_script_quotes_awkward_paths():
