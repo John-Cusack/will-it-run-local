@@ -3,6 +3,24 @@ import struct
 
 import pytest
 
+
+@pytest.fixture
+def isolated_runtime(monkeypatch):
+    """Make an omitted hardware/network mock fail before doing real work."""
+    import os
+    import subprocess
+    import sys
+    import urllib.request
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("test attempted an unmocked process, signal or network request")
+
+    monkeypatch.setattr(subprocess, "run", unexpected)
+    monkeypatch.setattr(subprocess, "Popen", unexpected)
+    monkeypatch.setattr(urllib.request, "urlopen", unexpected)
+    monkeypatch.setattr(os, "killpg", unexpected)
+    monkeypatch.setitem(sys.modules, "numpy", None)
+
 (T_UINT32, T_FLOAT32, T_STRING, T_ARRAY, T_UINT64) = 4, 6, 8, 9, 10
 
 

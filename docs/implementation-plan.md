@@ -30,6 +30,22 @@ The latest totals also reproduce on Python 3.14.2. Both edited workflows pass
 actionlint 1.7.12 locally; their remote jobs remain pending until authorised
 pushing/CI execution.
 
+## Coverage follow-up
+
+**Status: in progress.** The user asked to continue the remaining work. Close
+the Python line and branch gaps with behavioural tests and retain all hardware,
+network and publication restrictions. Hardware acceptance is separate.
+
+### C1: drafter discovery and compatibility
+
+**Status: complete.** Ten new fake-response tests cover search requests and
+failure, filename/family reduction, candidate deduplication/ranking, size/file
+limits, per-file/repository failures, remote trees, header-only checks and
+tokeniser warnings. Both modules now have 100% line and branch coverage.
+The suite passes 197 tests; overall coverage is 72.40% lines and 56.87% branches.
+No runtime changes or departures. Added an opt-in fixture that rejects any
+unmocked process, network request or signal in these tests.
+
 ## Decisions
 
 | decision | why |
