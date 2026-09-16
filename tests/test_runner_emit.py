@@ -189,3 +189,69 @@ def test_run_config_measures_selected_gpu(monkeypatch):
     result = runner.run_config(RunConfig("m", gpu_uuid="GPU-one"), "s", reps=1, verbose=False)
     assert result.ok and result.peak_vram == 123
     assert seen and all(uuid == "GPU-one" for uuid in seen)
+
+
+def test_read_only_lock_is_a_clear_error(tmp_path, monkeypatch):
+    import os
+    from wirl import lock
+    if os.geteuid() == 0:
+        pytest.skip("root bypasses file permissions")
+    path = tmp_path / "lock"
+    path.write_text("existing")
+    path.chmod(0o444)
+    monkeypatch.setattr(lock, "LOCK_PATH", str(path))
+    with pytest.raises(lock.LockUnavailable, match="owner:.*WIRL_LOCK"):
+        with lock.benchmark_lock():
+            pass
+
+
+def test_existing_lock_is_opened_without_create(tmp_path, monkeypatch):
+    import os
+    from wirl import lock
+    path = tmp_path / "lock"
+    path.write_text("existing")
+    inode = path.stat().st_ino
+    monkeypatch.setattr(lock, "LOCK_PATH", str(path))
+    real_open, flags = os.open, []
+
+    def opened(path, opts, *a):
+        flags.append(opts)
+        return real_open(path, opts, *a)
+
+    monkeypatch.setattr(lock.os, "open", opened)
+    with lock.benchmark_lock():
+        assert path.stat().st_ino == inode
+    assert flags == [os.O_RDWR]
+
+
+def test_new_lock_is_shared_despite_umask(tmp_path, monkeypatch):
+    import os
+    from wirl import lock
+    path = tmp_path / "lock"
+    monkeypatch.setattr(lock, "LOCK_PATH", str(path))
+    previous = os.umask(0o077)
+    try:
+        with lock.benchmark_lock():
+            assert path.stat().st_mode & 0o777 == 0o666
+    finally:
+        os.umask(previous)
+
+
+def test_lock_creation_race_retries_plain_open(tmp_path, monkeypatch):
+    import os
+    from wirl import lock
+    path = tmp_path / "lock"
+    monkeypatch.setattr(lock, "LOCK_PATH", str(path))
+    real_open, flags = os.open, []
+
+    def opened(filename, opts, *a):
+        flags.append(opts)
+        if len(flags) == 1:
+            path.write_text("created by another process")
+            raise FileNotFoundError(filename)
+        return real_open(filename, opts, *a)
+
+    monkeypatch.setattr(lock.os, "open", opened)
+    with lock.benchmark_lock():
+        pass
+    assert flags == [os.O_RDWR, os.O_RDWR | os.O_CREAT | os.O_EXCL, os.O_RDWR]

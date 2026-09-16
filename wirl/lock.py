@@ -26,9 +26,48 @@ class BenchmarkBusy(RuntimeError):
     pass
 
 
+class LockUnavailable(BenchmarkBusy):
+    """The shared lock file cannot be opened by this user."""
+
+
+def _open_lock():
+    try:
+        try:
+            # O_CREAT on another user's file in sticky /tmp is rejected by
+            # protected_regular, even when the file itself is world-writable.
+            return os.open(LOCK_PATH, os.O_RDWR)
+        except FileNotFoundError:
+            try:
+                fd = os.open(LOCK_PATH, os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o666)
+            except FileExistsError:
+                return os.open(LOCK_PATH, os.O_RDWR)
+            try:
+                os.fchmod(fd, 0o666)
+            except OSError:
+                os.close(fd)
+                raise
+            return fd
+    except PermissionError:
+        owner = "unknown"
+        try:
+            import pwd
+            uid = os.stat(LOCK_PATH).st_uid
+            owner = str(uid)
+            try:
+                owner = f"{pwd.getpwuid(uid).pw_name} (uid {uid})"
+            except KeyError:
+                pass
+        except OSError:
+            pass
+        raise LockUnavailable(
+            f"cannot open benchmark lock {LOCK_PATH} (owner: {owner}). "
+            "Ask its owner to make it writable, or set WIRL_LOCK to a shared "
+            "writable lock path for everyone benchmarking this machine.") from None
+
+
 @contextmanager
 def benchmark_lock(wait=False):
-    fd = os.open(LOCK_PATH, os.O_CREAT | os.O_RDWR, 0o666)
+    fd = _open_lock()
     try:
         flags = fcntl.LOCK_EX if wait else (fcntl.LOCK_EX | fcntl.LOCK_NB)
         try:

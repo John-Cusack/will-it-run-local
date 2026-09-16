@@ -413,6 +413,13 @@ fails.
 
 ### 3.1 The benchmark lock fails for a second user (recommended before release)
 
+**Status: complete.** Open existing locks without `O_CREAT`, create exclusively
+with explicit shared permissions, retry creation races, and report inaccessible
+locks as `LockUnavailable` with owner and `WIRL_LOCK` guidance. Four new tests
+(permissions, inode/plain open, restrictive umask, creation race) failed before
+the fix; plain `pytest -q`: 154 passed. Followed the plan. The real permission
+test skips under root, as specified; it ran on this machine.
+
 **Problem.** `benchmark_lock` opens `/tmp/will-it-run-local.benchmark.lock`
 with `O_CREAT` (`lock.py:31`), outside the `try`. The requested `0o666` is cut
 down by the umask, usually to `0644`. Worse, with `fs.protected_regular` set to
