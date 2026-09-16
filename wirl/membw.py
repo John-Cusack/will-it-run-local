@@ -12,10 +12,14 @@ Compiles a small C probe on first use and caches the binary.
 from __future__ import annotations
 
 import os
+import hashlib
+import json
+import shlex
 import shutil
 import statistics
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 
 CSRC = os.path.join(os.path.dirname(__file__), "csrc", "membw.c")
@@ -32,22 +36,41 @@ def _build_probe(force=False) -> tuple:
     """Return (binary, failure reason), keeping diagnostics with the result."""
     if sys.platform != "linux":
         return None, "will-it-run-local supports Linux only"
-    out = os.path.join(cache_dir(), "membw")
-    if os.path.exists(out) and not force:
-        if os.path.getmtime(out) >= os.path.getmtime(CSRC):
-            return out, None
     cc = os.environ.get("CC") or shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
     if not cc:
         return None, "no C compiler found (tried cc, gcc and clang)"
-    cmd = [cc, "-O2", "-pthread", CSRC, "-o", out]
     try:
+        command = shlex.split(cc) + ["-O2", "-pthread"]
+    except ValueError as e:
+        return None, f"invalid compiler command: {e}"
+    try:
+        with open(CSRC, "rb") as source:
+            digest = hashlib.sha256(source.read() + b"\0" + json.dumps(command).encode()).hexdigest()[:12]
+    except OSError as e:
+        return None, f"cannot read bandwidth probe source: {e}"
+    directory = cache_dir()
+    out = os.path.join(directory, f"membw-{digest}")
+    if os.path.isfile(out) and not force:
+        return out, None
+    pending = None
+    try:
+        # Separate installs with identical source share the cache; separate
+        # compiles never write over a binary another benchmark may be running.
+        fd, pending = tempfile.mkstemp(prefix=f".membw-{digest}-", dir=directory)
+        os.close(fd)
+        cmd = command + [CSRC, "-o", pending]
         p = subprocess.run(cmd, capture_output=True, text=True)
+        if p.returncode != 0:
+            detail = (p.stderr or p.stdout or f"exit {p.returncode}").strip()
+            return None, f"bandwidth probe compile failed ({cc}): {detail}"
+        os.chmod(pending, 0o755)
+        os.replace(pending, out)
+        return out, None
     except OSError as e:
         return None, f"bandwidth probe compile failed ({cc}): {e}"
-    if p.returncode != 0:
-        detail = (p.stderr or p.stdout or f"exit {p.returncode}").strip()
-        return None, f"bandwidth probe compile failed ({cc}): {detail}"
-    return out, None
+    finally:
+        if pending is not None and os.path.exists(pending):
+            os.unlink(pending)
 
 
 def build_probe(force=False) -> str | None:

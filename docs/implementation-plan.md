@@ -517,6 +517,17 @@ says the compile failed.
 
 ### 3.5 Probe binary cache: rebuild loops and a compile race
 
+**Status: complete.** Cache by source-content and compiler-command hash,
+compile to unique temporary outputs, and atomically replace complete executable
+binaries. Five tests cover distinct/shared source content, cache reuse, compiler
+options, failed rebuild preservation/cleanup and concurrent compiles; four
+failed before the fix, while cache reuse already passed.
+Plain `pytest -q`: 170 passed.
+
+**Refinement:** exclude install-specific source/output paths from the command
+hash so identical installs share a binary; split `CC` into argv to support
+compiler wrappers/options and hash the command actually invoked.
+
 **Problem.** `build_probe` (`membw.py:31`) caches a single binary at
 `~/.cache/will-it-run-local/membw` and reuses it if it's newer than the source.
 Two installs (say, pipx and a development checkout) keep rebuilding over each
