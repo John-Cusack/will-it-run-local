@@ -62,6 +62,38 @@ def vram_needed(mc, g, n_cpu_moe, ctx, k_type="f16", v_type="f16",
     return total + CUDA_OVERHEAD
 
 
+def vram_needed_dense(mc, g, n_gpu_layers, ctx, k_type="f16", v_type="f16"):
+    from .model import kv_cache_bytes
+    return (mc.resident_vram_dense(n_gpu_layers)
+            + kv_cache_bytes(g, ctx, k_type, v_type) * mc.kv_fraction_on_gpu(n_gpu_layers)
+            + CUDA_OVERHEAD)
+
+
+def min_ram_needed(mc, g, vram_budget, ctx, k_type="f16", v_type="f16",
+                   draft_mc=None, draft_g=None):
+    """RAM at the most-offloaded predicted fit, without a headroom margin.
+
+    Pre-flight blocks launches, so only rule out a model if even this best case
+    cannot fit. The measured sweep then finds the allocator's actual boundary.
+    """
+    from .model import kv_cache_bytes
+    kv = kv_cache_bytes(g, ctx, k_type, v_type)
+    draft = 0
+    if draft_mc is not None and draft_g is not None:
+        draft = draft_mc.total_bytes + kv_cache_bytes(draft_g, ctx, k_type, v_type)
+    if vram_budget > 0:
+        if mc.is_moe:
+            for n in range(mc.n_layer + 1):
+                if vram_needed(mc, g, n, ctx, k_type, v_type, draft_mc, draft_g) <= vram_budget:
+                    return max(0, mc.total_bytes - mc.resident_vram_weights(n))
+        else:
+            for n in range(mc.n_layer, -1, -1):
+                if vram_needed_dense(mc, g, n, ctx, k_type, v_type) + draft <= vram_budget:
+                    return int(max(0, mc.total_bytes - mc.resident_vram_dense(n))
+                               + kv * (1 - mc.kv_fraction_on_gpu(n)))
+    return mc.total_bytes + kv + draft
+
+
 def dense_curve(mc, g, bw_cpu, bw_gpu, vram_budget, ctx,
                 efficiency=DEFAULT_EFFICIENCY, k_type="f16", v_type="f16"):
     """Predicted throughput and VRAM for every --n-gpu-layers value.
@@ -70,8 +102,6 @@ def dense_curve(mc, g, bw_cpu, bw_gpu, vram_budget, ctx,
     routed experts to leave behind, so whole layers move, taking their share of
     the KV cache with them.
     """
-    from .model import kv_cache_bytes
-    kv_total = kv_cache_bytes(g, ctx, k_type, v_type)
     out = []
     for n in range(0, mc.n_layer + 1):
         cpu_b, gpu_b = mc.split_dense(n)
@@ -79,8 +109,7 @@ def dense_curve(mc, g, bw_cpu, bw_gpu, vram_budget, ctx,
         t_gpu = gpu_b / bw_gpu if bw_gpu else 0.0
         total = t_cpu + t_gpu
         tps = 1.0 / total if total else 0.0
-        vr = (mc.resident_vram_dense(n)
-              + kv_total * mc.kv_fraction_on_gpu(n) + CUDA_OVERHEAD)
+        vr = vram_needed_dense(mc, g, n, ctx, k_type, v_type)
         out.append(Prediction(n, cpu_b, gpu_b, vr, vr <= vram_budget,
                               tps, t_cpu * 1e3, t_gpu * 1e3))
     return out

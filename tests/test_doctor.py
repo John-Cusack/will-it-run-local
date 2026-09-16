@@ -72,12 +72,12 @@ def test_zen2_without_avx512_is_fine():
 
 
 def test_model_larger_than_ram_is_blocking():
-    c = doctor.check_ram_for_model(_mem(available=100 * GiB), 156 * GiB, 0)
+    c = doctor.check_ram_for_model(_mem(available=100 * GiB), 156 * GiB)
     assert c.status == doctor.FAIL
 
 
 def test_offloading_to_gpu_can_make_it_fit():
-    c = doctor.check_ram_for_model(_mem(available=100 * GiB), 156 * GiB, 80 * GiB)
+    c = doctor.check_ram_for_model(_mem(available=100 * GiB), 76 * GiB)
     assert c.status == doctor.OK
 
 

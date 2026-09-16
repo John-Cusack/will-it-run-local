@@ -342,6 +342,21 @@ core, matching `lscpu -e=CPU,CORE`, on both layouts.
 
 ### 2.5 `wirl auto` refuses models bigger than free RAM, even when RAM plus VRAM is enough
 
+**Status: complete.** Extracted dense VRAM accounting and added the
+most-offloaded RAM requirement, including CPU-side dense KV. Auto and doctor
+use it; doctor accepts context and VRAM options. Six new cases cover monotonic
+MoE/dense requirements, drafts, CPU fallback and both CLI pre-flights with
+explicit context/VRAM overrides. These and the two updated doctor-signature
+tests failed before the fix. Plain `pytest -q`: 150 passed; the measured
+figures in `tests/test_predict.py` are unchanged.
+
+**Departure:** reserve draft weights + KV for dense pre-flight too, and include
+them in the CPU fallback's RAM requirement. The proposed fallback omitted a
+supplied draft even when neither model can be offloaded. Dense speed prediction
+remains unchanged; this reservation only informs the RAM pre-flight check.
+The two existing doctor tests pass the computed RAM need directly, retaining
+their original blocking/offload scenarios under the new signature.
+
 **Problem.** `cmd_auto` runs the pre-flight checks with `gpu_bytes=0`
 (`cli.py:278`), so `doctor.check_ram_for_model` counts the whole model against
 system RAM. Whenever the model is bigger than available RAM that is a blocking

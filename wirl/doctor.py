@@ -171,21 +171,22 @@ def check_stale_autotune() -> Check:
     return Check("autotune-cache", OK, "no kernel autotune caches found.")
 
 
-def check_ram_for_model(mem, model_bytes, gpu_bytes) -> Check:
-    need = max(0, model_bytes - gpu_bytes)
+def check_ram_for_model(mem, ram_need) -> Check:
+    need = max(0, ram_need)
     avail = mem["available"]
+    basis = "Most-offloaded configuration that fits in VRAM: "
     if need > avail:
         return Check("ram-capacity", FAIL,
-                     f"needs ~{_gib(need):.0f} GiB in RAM but only "
+                     basis + f"needs ~{_gib(need):.0f} GiB in RAM but only "
                      f"{_gib(avail):.0f} GiB is available.",
                      "It will swap and be unusably slow. Use a smaller "
                      "quantisation or offload more to the GPU.")
     if need > 0.9 * avail:
         return Check("ram-capacity", WARN,
-                     f"needs ~{_gib(need):.0f} GiB of {_gib(avail):.0f} GiB available.",
+                     basis + f"needs ~{_gib(need):.0f} GiB of {_gib(avail):.0f} GiB available.",
                      "Very little margin. The page cache will thrash.")
     return Check("ram-capacity", OK,
-                 f"~{_gib(need):.0f} GiB needed in RAM, {_gib(avail):.0f} GiB available.")
+                 basis + f"~{_gib(need):.0f} GiB needed in RAM, {_gib(avail):.0f} GiB available.")
 
 
 def check_disk(path, need_bytes) -> Check:
@@ -287,7 +288,7 @@ def check_prompt_cache(server_log=None) -> Check:
     return Check("prompt-cache", OK, "no prompt-cache warnings in the server log.")
 
 
-def run_all(model_bytes=None, gpu_bytes=0, cache_type_k="f16", path=".",
+def run_all(ram_need=None, cache_type_k="f16", path=".",
             llama_server=None, server_log=None, gpu_index=0) -> list:
     from .lock import foreign_gpu_users
     from .probe import cpu_info, gpu_info, mem_info
@@ -307,7 +308,7 @@ def run_all(model_bytes=None, gpu_bytes=0, cache_type_k="f16", path=".",
         check_k_cache_quant(cache_type_k, cpu),
         check_prompt_cache(server_log),
     ]
-    if model_bytes:
-        checks.append(check_ram_for_model(mem, model_bytes, gpu_bytes))
+    if ram_need is not None:
+        checks.append(check_ram_for_model(mem, ram_need))
         checks.append(check_disk(path, 0))
     return checks

@@ -278,7 +278,9 @@ def cmd_auto(args):
 
     # ---- 2. pre-flight ---------------------------------------------------
     head("2. Pre-flight")
-    checks = doctor.run_all(mc.total_bytes, 0, cache_type_k=args.cache_type_k,
+    ram_need = predict.min_ram_needed(mc, g, budget, args.ctx, args.cache_type_k,
+                                      draft_mc=dmc, draft_g=dg)
+    checks = doctor.run_all(ram_need=ram_need, cache_type_k=args.cache_type_k,
                             llama_server=args.llama_server, gpu_index=args.gpu)
     report.print_checks(checks, show_ok=False)
     blocking = [ch for ch in checks if ch.status == doctor.FAIL]
@@ -657,16 +659,13 @@ def cmd_find_draft(args):
 
 
 def cmd_doctor(args):
-    gpu, _, _ = _gpu_choice(args)
-    model_bytes = gpu_bytes = 0
+    _, budget, _ = _gpu_choice(args)
+    ram_need = None
     if args.model:
-        _, mc = _load(args.model)
-        model_bytes = mc.total_bytes
-        # Anything already resident on the GPU is not competing for RAM.
-        if gpu:
-            gpu_bytes = min(gpu["vram_total"], model_bytes)
+        g, mc = _load(args.model)
+        ram_need = predict.min_ram_needed(mc, g, budget, args.ctx, args.cache_type_k)
     head("Pre-flight checks")
-    checks = doctor.run_all(model_bytes or None, gpu_bytes,
+    checks = doctor.run_all(ram_need=ram_need,
                             cache_type_k=args.cache_type_k,
                             path=os.path.dirname(args.model) if args.model else ".",
                             llama_server=args.llama_server,
@@ -959,6 +958,7 @@ def build_parser():
 
     sp = sub.add_parser("doctor", help="check for conditions that silently ruin results")
     gpu_opts(sp)
+    sp.add_argument("--ctx", type=int, default=16384)
     sp.add_argument("--model")
     sp.add_argument("--llama-server")
     sp.add_argument("--server-log",
