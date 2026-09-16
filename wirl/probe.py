@@ -130,6 +130,7 @@ def mem_info() -> dict:
         mi[k] = int(v.split()[0]) * 1024 if v.split() else 0
     out = {
         "total": mi.get("MemTotal", 0),
+        "free": mi.get("MemFree", 0),
         "available": mi.get("MemAvailable", 0),
         "swap_total": mi.get("SwapTotal", 0),
         "swap_free": mi.get("SwapFree", 0),

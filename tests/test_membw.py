@@ -4,13 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from wirl import membw
+from wirl import membw, probe
 
 
 @pytest.fixture(autouse=True)
 def no_packaged_probe(monkeypatch, tmp_path):
     # Compilation tests must also run against a wheel containing a real probe.
     monkeypatch.setattr(membw, "PACKAGED_PROBE", str(tmp_path / "absent"), raising=False)
+    monkeypatch.setattr(probe, "mem_info", lambda: {"free": 100 << 30, "available": 100 << 30})
+    monkeypatch.setattr(probe, "swap_activity", lambda: {"pswpin": 0, "pswpout": 0})
 
 
 def test_compile_failure_reports_compiler_reason(monkeypatch, tmp_path, capsys):

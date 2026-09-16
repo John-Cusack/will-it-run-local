@@ -10,6 +10,12 @@ from wirl import membw, probe
 pytestmark = pytest.mark.usefixtures("isolated_runtime")
 
 
+@pytest.fixture(autouse=True)
+def idle_memory(monkeypatch):
+    monkeypatch.setattr(probe, "mem_info", lambda: {"free": 100 << 30, "available": 100 << 30})
+    monkeypatch.setattr(probe, "swap_activity", lambda: {"pswpin": 0, "pswpout": 0})
+
+
 def test_cache_directory_respects_xdg_and_home(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
     assert membw.cache_dir() == str(tmp_path / "xdg" / "will-it-run-local")
@@ -78,7 +84,7 @@ def test_numpy_fallback_uses_fake_array_and_clock(monkeypatch):
 
 def test_measure_defaults_cores_output_and_failures(monkeypatch):
     monkeypatch.setattr(probe, "cpu_info", lambda: {"physical": 4})
-    monkeypatch.setattr(probe, "mem_info", lambda: {"available": 100<<30})
+    monkeypatch.setattr(probe, "mem_info", lambda: {"available": 100<<30, "free": 100<<30})
     monkeypatch.setattr(membw, "_build_probe", lambda: ("fake-probe", None))
     calls = []
     text = "banner\nstream 0 1 2000000000\nstream 1 0 2000000000\n"

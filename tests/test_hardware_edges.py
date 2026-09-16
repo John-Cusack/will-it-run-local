@@ -64,9 +64,17 @@ def test_memory_and_swap_inventory(monkeypatch, edac):
     monkeypatch.setattr(probe.os.path, "isdir", lambda path: edac)
     monkeypatch.setattr(probe.os, "listdir", lambda path: ["mc0", "mc1", "mc2"])
     info = probe.mem_info()
-    assert info == dict(total=100*1024, available=70*1024, swap_total=40*1024,
+    assert info == dict(total=100*1024, free=0, available=70*1024, swap_total=40*1024,
                         swap_free=30*1024, swap_used=10*1024, edac_total=128*1024*1024 if edac else 0)
     assert probe.swap_activity() == {"pswpin": 3, "pswpout": 7}
+
+
+def test_inventory_reports_unused_ram(monkeypatch):
+    monkeypatch.setattr(probe, "_read", lambda path, default=None:
+                        "MemAvailable: 25000 kB\nMemFree: 800 kB" if path == "/proc/meminfo" else default)
+    monkeypatch.setattr(probe.os.path, "isdir", lambda path: False)
+    result = probe.mem_info()
+    assert result["free"] == 800 * 1024 and result["available"] == 25000 * 1024
 
 
 def test_gpu_absence_failed_queries_and_malformed_rows(monkeypatch):

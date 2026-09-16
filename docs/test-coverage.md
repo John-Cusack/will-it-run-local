@@ -1,16 +1,16 @@
 # Test coverage
 
 **Current status: 100% Python line and branch coverage.** On 2026-09-16 the
-completed coverage follow-up passes 353 tests and covers all 2354 statements
-and 726 branch outcomes across every module in `wirl`. No source files,
-statements or error paths are excluded. The small statement-count reduction
-comes from simplifying an unreachable empty-parent guard, rather than hiding
-code from coverage.
+completed coverage and bandwidth follow-ups pass 369 tests and cover all 2381 statements
+and 734 branch outcomes across every module in `wirl`. No source files,
+statements or error paths are excluded. The bandwidth allocation/swap guards
+add 27 statements and eight branch outcomes to the earlier 353-test totals.
 Fresh editable-install venvs on Python 3.9.25 and 3.14.2 reproduce these exact
 totals and pass plain `pytest -q`. The extracted CI test/JSON gate also passes
 locally on 3.14.2. Python 3.12.3 passes the same suite and coverage totals.
 
-The follow-up adds 166 tests/cases covering the gaps below. The tests exposed
+The follow-ups add 182 tests/cases covering the gaps below and allocation/swap
+safety. The tests exposed
 and fixed an extra blank first line when wrapping a long word. Two redundant
 empty-list guards after head-count normalisation were also simplified. Existing
 tests and the published measurements in `tests/test_predict.py` are unchanged.

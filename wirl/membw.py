@@ -126,34 +126,52 @@ def _numpy_stream(gib: int, reps: int) -> BwResult | None:
     return BwResult("stream", 1, gib, samples, "numpy (single-threaded lower bound)")
 
 
-def measure(mode="stream", threads=None, gib=None, reps=3, cores=None) -> BwResult:
-    """Run the bandwidth probe.
+def _buffer_gib(gib=None) -> int:
+    from .probe import mem_info
 
-    The buffer must be far larger than last-level cache or the result measures
-    cache, not memory. It must also fit comfortably in free RAM: swapping
-    during the probe produces a number that means nothing.
-    """
-    from .probe import cpu_info, mem_info
-
-    if threads is None:
-        threads = cpu_info()["physical"]
+    memory = mem_info()
+    # The 8 GiB allocation on a cache-filled 64 GiB host triggered swapping
+    # despite 25 GiB MemAvailable. Leave headroom in genuinely unused RAM too.
+    room = min(memory["available"], memory["free"]) // (1 << 30)
+    budget = int(room * 0.35)
     if gib is None:
-        avail_gib = mem_info()["available"] // (1 << 30)
-        gib = max(2, min(32, int(avail_gib * 0.35)))
+        gib = min(32, budget)
+        if gib < 2:
+            raise RuntimeError("not enough unused RAM for a 2 GiB bandwidth buffer; "
+                               "let memory activity settle before measuring")
+    if gib <= 0:
+        raise ValueError("bandwidth buffer size must be positive")
+    if gib > budget:
+        raise RuntimeError(f"{gib} GiB bandwidth buffer exceeds unused RAM headroom "
+                           f"({budget} GiB budget); choose a smaller buffer")
+    return gib
 
-    bin_path, reason = _build_probe()
-    if not bin_path:
-        r = _numpy_stream(gib, reps)
-        if r:
-            return r
-        raise RuntimeError(f"{reason}; no numpy fallback: cannot measure bandwidth")
 
+def _check_swap(before):
+    from .probe import swap_activity
+
+    after = swap_activity()
+    page_in = after["pswpin"] - before["pswpin"]
+    page_out = after["pswpout"] - before["pswpout"]
+    if page_in > 0 or page_out > 0:
+        raise RuntimeError(f"bandwidth measurement invalid: swapping detected "
+                           f"({page_in} pages in, {page_out} pages out); "
+                           "let memory activity settle before measuring")
+
+
+def _measure_probe(bin_path, mode, threads, gib, reps, cores=None) -> BwResult:
+    """Use the same guards for packaged/source acceptance measurements."""
+    from .probe import swap_activity
+
+    gib = _buffer_gib(gib)
     cmd = [bin_path, mode, str(threads), str(gib), str(reps)]
     if cores:
         cmd.append(",".join(str(c) for c in cores))
+    before = swap_activity()
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
     if p.returncode != 0:
         raise RuntimeError(f"bandwidth probe failed: {p.stderr.strip()}")
+    _check_swap(before)
 
     samples = []
     for line in p.stdout.strip().splitlines():
@@ -163,6 +181,30 @@ def measure(mode="stream", threads=None, gib=None, reps=3, cores=None) -> BwResu
             if el > 0:
                 samples.append(nbytes / el / 1e9)
     return BwResult(mode, threads, gib, samples, "c-probe")
+
+
+def measure(mode="stream", threads=None, gib=None, reps=3, cores=None) -> BwResult:
+    """Run the bandwidth probe.
+
+    The buffer must be far larger than last-level cache or the result measures
+    cache, not memory. It must also fit comfortably in free RAM: swapping
+    during the probe produces a number that means nothing.
+    """
+    from .probe import cpu_info, swap_activity
+
+    if threads is None:
+        threads = cpu_info()["physical"]
+    gib = _buffer_gib(gib)
+
+    bin_path, reason = _build_probe()
+    if not bin_path:
+        before = swap_activity()
+        r = _numpy_stream(gib, reps)
+        if r:
+            _check_swap(before)
+            return r
+        raise RuntimeError(f"{reason}; no numpy fallback: cannot measure bandwidth")
+    return _measure_probe(bin_path, mode, threads, gib, reps, cores)
 
 
 def measure_both(threads=None, gib=None, reps=3) -> dict:

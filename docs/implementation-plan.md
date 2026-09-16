@@ -20,9 +20,9 @@ llama-server/service operations, auto/tune runs, pushing, tagging and external
 account setup remain in force. Record the actual host inventory rather than
 assuming it matches the documented reference machine.
 
-**Coverage status: complete for the Python package.** The follow-up adds 166
-tests/cases, bringing the suite to 353 passing tests. Every `wirl` module has
-100% line and branch coverage: 2354 statements and 726 branch outcomes, with
+**Coverage status: complete for the Python package.** The coverage and bandwidth
+follow-ups add 182 tests/cases, bringing the suite to 369 passing tests. Every
+`wirl` module has 100% line and branch coverage: 2381 statements and 734 branch outcomes, with
 zero missing or excluded lines. CI now requires 100% and independently checks
 the JSON statement/branch totals. Historical measurements are retained in
 `docs/test-coverage.md`. C kernels and workflow/hardware acceptance are separate.
@@ -767,6 +767,40 @@ all 353 tests on Python 3.9.25, 3.12.3 and 3.14.2 in the existing throwaway
 development venvs. Validated the recorded raw samples, alternating order,
 source identity, range checks and successful compiler-free container output.
 No unit tests or runtime code changed; these are manual integration results.
+
+### 4.1 Prevent allocation pressure and reject swapped measurements
+
+**Status: complete.** Investigation found no memory.high/memory.max limits or
+cgroup reclaim events, and normal VM watermarks/swappiness. The initial host
+had only 758 MiB unused RAM despite 25 GiB MemAvailable; allocating 8 GiB
+coincided with reclaim, swap-outs and increased memory pressure. The estimate
+was not a sufficient allocation safeguard. Stream and gather inner-loop
+instruction bytes are identical between the GCC 14 prebuilt and GCC 11 local
+probes, so there is no evidence for changing compiler flags or measured kernels.
+
+Added `free` (MemFree) to inventory. Buffer sizing keeps the existing 35%
+fraction and 32 GiB default cap, and also bounds the budget by unused RAM.
+Refuse automatic buffers below 2 GiB and explicit buffers exceeding that
+headroom before launching. Check page-in/page-out counters across C and numpy
+measurements and reject concurrent swapping with a diagnostic. Historical
+swap occupancy alone is allowed. The C kernels and predictor figures remain
+unchanged; `_measure_probe` shares these guards with acceptance tooling.
+
+**Tests:** sixteen new mocked cases cover cache-filled/default sizing, scarce
+RAM, unsafe explicit sizes, invalid sizes, both swap directions, historical
+swap occupancy, numpy guards and MemFree parsing. Twelve failed on the original
+code (including process-denial sentinels for missing preflight guards). Existing
+inventory equality now includes the new `free` field; compilation/measurement
+tests use fake free RAM and stable swap counters to remain independent of CI
+hardware. Their original output/cache/flag assertions are retained.
+Plain pytest passes 369 tests on 3.9.25, 3.12.3 and 3.14.2; exact Python line and
+branch coverage remains 100% (2381 statements, 734 branch outcomes).
+
+**Departure:** extend Phase 4 with the allocation/swap safeguards exposed by
+its real measurements, rather than changing C kernels to hide a noisy result.
+**Done when:** the 8 GiB-free/25 GiB-available fixture chooses 2 GiB, unsafe
+allocations never start a process, and neither measurement backend returns a
+bandwidth figure when swap counters increase. All checks pass.
 
 **Start when** issues report "no C compiler", or before promoting the tool to
 people who don't build llama.cpp themselves. People running llama.cpp from
