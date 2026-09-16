@@ -21,8 +21,8 @@ account setup remain in force. Record the actual host inventory rather than
 assuming it matches the documented reference machine.
 
 **Coverage status: complete for the Python package.** The coverage and bandwidth
-follow-ups add 182 tests/cases, bringing the suite to 369 passing tests. Every
-`wirl` module has 100% line and branch coverage: 2381 statements and 734 branch outcomes, with
+follow-ups add 215 tests/cases, bringing the suite to 402 passing tests. Every
+`wirl` module has 100% line and branch coverage: 2386 statements and 736 branch outcomes, with
 zero missing or excluded lines. CI now requires 100% and independently checks
 the JSON statement/branch totals. Historical measurements are retained in
 `docs/test-coverage.md`. C kernels and workflow/hardware acceptance are separate.
@@ -762,7 +762,7 @@ and native ARM execution. No ARM runner is available locally. Remote CI has
 not run; no service operations, tags or pushes were performed. Do not claim
 Phase 4 fully accepted until the remaining measurements pass.
 
-**Follow-up verification:** plain `pytest -q` from the repository root passes
+**Initial bandwidth verification:** plain `pytest -q` from the repository root passes
 all 353 tests on Python 3.9.25, 3.12.3 and 3.14.2 in the existing throwaway
 development venvs. Validated the recorded raw samples, alternating order,
 source identity, range checks and successful compiler-free container output.
@@ -770,7 +770,7 @@ No unit tests or runtime code changed; these are manual integration results.
 
 ### 4.1 Prevent allocation pressure and reject swapped measurements
 
-**Status: complete.** Investigation found no memory.high/memory.max limits or
+**Status: complete; swap attribution refined in 4.2.** Investigation found no memory.high/memory.max limits or
 cgroup reclaim events, and normal VM watermarks/swappiness. The initial host
 had only 758 MiB unused RAM despite 25 GiB MemAvailable; allocating 8 GiB
 coincided with reclaim, swap-outs and increased memory pressure. The estimate
@@ -800,7 +800,79 @@ branch coverage remains 100% (2381 statements, 734 branch outcomes).
 its real measurements, rather than changing C kernels to hide a noisy result.
 **Done when:** the 8 GiB-free/25 GiB-available fixture chooses 2 GiB, unsafe
 allocations never start a process, and neither measurement backend returns a
-bandwidth figure when swap counters increase. All checks pass.
+bandwidth figure during swapping. Initially any global counter increase
+invalidated the result; 4.2 corrects attribution and adds timed-fault checks.
+
+### 4.2 Correct the comparison protocol and attribute page faults
+
+**Status: complete on the available x86_64 host; reference/ARM execution pending.**
+Confirmed that strict containment of all three prebuilt samples within three
+local extrema passes only four of the 20 equally likely label assignments for
+equal independent continuous distributions. Even the original median-inside-
+range gate passes only 12/20. These were unreliable interpretations of the
+plan's measured-spread rule, not evidence of a kernel regression.
+
+Added `tools/compare_probe_bandwidth.py`: three alternating launches per binary
+per mode, with the normal three repetitions and all samples retained. Compare
+the absolute difference between median launch medians with the local raw
+peak-to-peak spread; refuse either probe's raw spread above the existing 10%
+bandwidth instability threshold. Refuse incomplete output, timed faults and
+new swap-outs, and preserve diagnostics/partial samples on failure. Compilation
+uses a throwaway cache without changing the caller's cache setting. Include
+the tool in the sdist so its mocked tests run against installed wheels too.
+
+The first guarded rerun aborted after a single global page-in with zero
+swap-outs. A system-wide counter alone cannot attribute I/O to the probe.
+Global swap-outs still reject allocation pressure, and all page-in counts
+remain recorded. Added `getrusage(RUSAGE_SELF)` checks before and after each C
+timing window to reject major faults in the measured process (all threads).
+Both diagnostic calls are outside the clock interval; neither worker kernel
+nor the byte count changes. The numpy fallback gets equivalent process fault
+checks. The original false-positive abort is retained with the earlier runs.
+
+**Tests:** 30 mocked comparison cases cover numerical shifts, outliers,
+instability, invalid samples/counts, alternating order, cache restoration,
+preflight/measurement refusal, page-in/out attribution, occupied benchmark
+locks and JSON/exit statuses. The tool uses the shared benchmark lock; an
+explicit occupied-lock integration check refuses before compilation or timing.
+Four new safety cases cover unrelated page-ins, C fault diagnostics and numpy
+timed faults. Replaced the page-in-only rejection case because it attributed
+an unrelated system-wide event to the measured workload; kept swap-out cases
+and added scoped fault checks instead. Net increase: 33 cases, 402 total.
+An explicit C fault-injection integration check makes the old probe report
+numbers and the new probe reject them in both modes, and exercises both
+getrusage error paths. No fault was actually induced in host memory.
+
+**Measured verification:** rebuilt/repaired the wheel; its installed container
+suite passes 400 tests and skips the existing real-permission case under root.
+The corrected host comparison uses the new automatic 2 GiB buffer and passes
+stream/gather: median differences 0.07% / 1.38%, local raw spreads 3.10% / 8.06%,
+zero new swap-outs and no timed major faults. Four background page-in pages
+are retained as context. The updated wheel also measures both kernels in the
+network-disabled compiler-free container (21.18 / 4.52 GB/s). Full records are
+in `docs/phase4-bandwidth-results.json`; explanation and reproduction are in
+`docs/phase4-bandwidth-acceptance.md`.
+
+**Departures:** use the difference-versus-spread rule applied by `tune`, rather
+than false-positive extrema containment. Use three repetitions per launch to
+reduce the short timing windows' sensitivity to startup variation, retaining
+every repetition. Add timing diagnostics to C while leaving measured kernels
+unchanged. Attribute disk faults to the workload instead of inventing a
+permitted global page-in threshold. No existing test was weakened to permit
+bad measurements; scoped fault failures now have explicit regression checks.
+**Done when:** equal-centre distributions with outlying extrema can pass,
+shifts larger than measured noise and unstable runs fail, timed faults and
+new swap-outs cannot pass, the updated wheel passes both host modes, and the
+compiler-free container still measures. All local checks pass; the actual
+EPYC reference and native ARM runs remain separate pending checks.
+
+**Final verification:** fresh editable-install venvs on Python 3.9.25 and
+3.14.2 pass plain `pytest -q` from the repository root (402 each), as does
+Python 3.12.3. Exact Python coverage is 100% (2386/2386 statements and 736/736
+branch outcomes, zero exclusions). The rebuilt sdist includes the comparison
+tool and every test; all 402 pass against the installed repaired wheel on
+3.14.2 from outside the checkout. Strict twine checks pass. Nothing was pushed,
+tagged or published, and no service was changed.
 
 **Start when** issues report "no C compiler", or before promoting the tool to
 people who don't build llama.cpp themselves. People running llama.cpp from

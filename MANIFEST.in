@@ -1,5 +1,6 @@
 # setuptools only picks up tests/test*.py on its own. Without conftest.py the
 # suite cannot run from an sdist, which is how distro packagers test.
 recursive-include tests *.py
+include tools/compare_probe_bandwidth.py
 # Generated binaries belong in platform wheels, never in the portable sdist.
 recursive-exclude wirl/_bin *

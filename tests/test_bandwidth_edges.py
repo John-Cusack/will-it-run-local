@@ -14,6 +14,7 @@ pytestmark = pytest.mark.usefixtures("isolated_runtime")
 def idle_memory(monkeypatch):
     monkeypatch.setattr(probe, "mem_info", lambda: {"free": 100 << 30, "available": 100 << 30})
     monkeypatch.setattr(probe, "swap_activity", lambda: {"pswpin": 0, "pswpout": 0})
+    monkeypatch.setattr("resource.getrusage", lambda who: SimpleNamespace(ru_majflt=0))
 
 
 def test_cache_directory_respects_xdg_and_home(monkeypatch, tmp_path):

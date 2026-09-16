@@ -178,6 +178,11 @@ $ wirl bandwidth        # reference machine, idle, model resident in page cache
 `stream` is the optimistic bound and predicts reading a contiguous expert
 tensor. `gather` defeats the prefetcher and exposes real DRAM latency.
 
+Buffers leave headroom in unused RAM as well as available RAM. The probe
+refuses unsafe allocations and results taken during swap-outs or timed major
+page faults. If there is too little unused RAM, let memory activity settle or
+give inference commands `--mem-bandwidth` to use an existing measurement.
+
 Run it while something else is using the machine and you get 22.6 GB/s on the
 same hardware — which is the point. If repetitions disagree, the machine is not
 stable and **no inference benchmark taken right now means anything**; `wirl`

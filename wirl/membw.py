@@ -110,6 +110,7 @@ class BwResult:
 def _numpy_stream(gib: int, reps: int) -> BwResult | None:
     """Fallback when no C compiler exists. A lower bound, not a measurement."""
     try:
+        import resource
         import time
 
         import numpy as np
@@ -119,9 +120,13 @@ def _numpy_stream(gib: int, reps: int) -> BwResult | None:
     a = np.ones(n, dtype=np.uint64)
     samples = []
     for _ in range(reps):
+        before = resource.getrusage(resource.RUSAGE_SELF).ru_majflt
         t0 = time.monotonic()
         int(a.sum())
         el = time.monotonic() - t0
+        after = resource.getrusage(resource.RUSAGE_SELF).ru_majflt
+        if after > before:
+            raise RuntimeError("major page faults during timed numpy bandwidth measurement; result invalid")
         samples.append((n * 8) / el / 1e9)
     return BwResult("stream", 1, gib, samples, "numpy (single-threaded lower bound)")
 
@@ -153,7 +158,9 @@ def _check_swap(before):
     after = swap_activity()
     page_in = after["pswpin"] - before["pswpin"]
     page_out = after["pswpout"] - before["pswpout"]
-    if page_in > 0 or page_out > 0:
+    # A single unrelated page-in aborted the guarded comparison. Timed major
+    # faults are checked in each kernel; new swap-outs still mean pressure.
+    if page_out > 0:
         raise RuntimeError(f"bandwidth measurement invalid: swapping detected "
                            f"({page_in} pages in, {page_out} pages out); "
                            "let memory activity settle before measuring")

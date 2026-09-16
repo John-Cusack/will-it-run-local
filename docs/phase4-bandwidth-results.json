@@ -1024,5 +1024,1327 @@
   "remaining_acceptance": [
     "Idle EPYC 7B12 reference-machine comparison",
     "Native aarch64 wheel execution and remote CI"
-  ]
+  ],
+  "fix_investigation": {
+    "original_inner_loops": {
+      "stream": {
+        "prebuilt_address": "0x401800",
+        "local_address": "0x19d0",
+        "bytes": 15,
+        "hex": "488b0a4883c2404801c84839f275f1",
+        "sha256": "67da7853d531e344dabd272cf2b9a4b577931e2163dbe0dbf2d91f3542d9e7ec",
+        "identical": true
+      },
+      "gather": {
+        "prebuilt_address": "0x401740",
+        "local_address": "0x1900",
+        "bytes": 59,
+        "hex": "4889ca83c60148c1e20d4831ca4889d048c1e8074831d031d24889c148c1e1114831c14889c848f7f748c1e2064c01da488b024901c04439d675c5",
+        "sha256": "0379c5f3918b8cffb8c2500c4def9c603e67d6744b9211c654d40dd71eae8da6",
+        "identical": true
+      }
+    },
+    "page_in_false_positive_abort": {
+      "host": {
+        "model": "AMD Ryzen 9 5950X 16-Core Processor",
+        "logical": 32,
+        "physical": 16,
+        "sockets": 1,
+        "numa_nodes": 1,
+        "isa": {
+          "avx2": true,
+          "fma": true,
+          "avx512f": false,
+          "avx512_bf16": false,
+          "amx_int8": false
+        },
+        "governor": "powersave"
+      },
+      "parameters": {
+        "threads": 16,
+        "cores": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "gib": 2,
+        "reps": 3
+      },
+      "source_sha256": "bbad0058f2c61ac28a6d303f7ad271325a92e022463624598b91a583b7d46ad3",
+      "binary_sha256": {
+        "prebuilt": "9edce06f42972726e7f9b0413c8317fd0f27f537b08a585ca15c3e52e0ec09c4",
+        "local": "7a247b217911fdf842cd50549807c451143b0658bfec63f3474279c4135ac43a"
+      },
+      "criterion": "absolute median difference <= local raw peak-to-peak spread; both raw spreads <= 10%; no concurrent swapping",
+      "before": {
+        "utc": "2026-09-16T15:33:19.654542+00:00",
+        "memory": {
+          "total": 67337146368,
+          "free": 8728084480,
+          "available": 27938803712,
+          "swap_total": 8589930496,
+          "swap_free": 7881322496,
+          "swap_used": 708608000,
+          "edac_total": 0
+        },
+        "swap_activity": {
+          "pswpin": 47090,
+          "pswpout": 163154
+        },
+        "load_average": [
+          3.0029296875,
+          2.80712890625,
+          2.32763671875
+        ]
+      },
+      "runs": [
+        {
+          "mode": "stream",
+          "probe": "prebuilt",
+          "launch": 1,
+          "samples": [
+            28.712361424197454,
+            29.31958451204194,
+            29.189664917765395
+          ],
+          "before": {
+            "utc": "2026-09-16T15:33:19.654756+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8728084480,
+              "available": 27938803712,
+              "swap_total": 8589930496,
+              "swap_free": 7881322496,
+              "swap_used": 708608000,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47090,
+              "pswpout": 163154
+            },
+            "load_average": [
+              3.0029296875,
+              2.80712890625,
+              2.32763671875
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:33:21.199575+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8455663616,
+              "available": 27666456576,
+              "swap_total": 8589930496,
+              "swap_free": 7881322496,
+              "swap_used": 708608000,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47090,
+              "pswpout": 163154
+            },
+            "load_average": [
+              3.0029296875,
+              2.80712890625,
+              2.32763671875
+            ]
+          }
+        },
+        {
+          "mode": "stream",
+          "probe": "local",
+          "launch": 1,
+          "samples": [
+            27.68303359372986,
+            26.036101017203965,
+            27.308472341616014
+          ],
+          "before": {
+            "utc": "2026-09-16T15:33:21.199834+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8455663616,
+              "available": 27666456576,
+              "swap_total": 8589930496,
+              "swap_free": 7881322496,
+              "swap_used": 708608000,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47090,
+              "pswpout": 163154
+            },
+            "load_average": [
+              3.0029296875,
+              2.80712890625,
+              2.32763671875
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:33:22.753899+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8284901376,
+              "available": 27495772160,
+              "swap_total": 8589930496,
+              "swap_free": 7881322496,
+              "swap_used": 708608000,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47090,
+              "pswpout": 163154
+            },
+            "load_average": [
+              3.0029296875,
+              2.80712890625,
+              2.32763671875
+            ]
+          }
+        },
+        {
+          "mode": "stream",
+          "probe": "prebuilt",
+          "launch": 2,
+          "samples": [
+            29.216272097737505,
+            29.30678050111906,
+            29.54751232130327
+          ],
+          "before": {
+            "utc": "2026-09-16T15:33:22.754184+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8284901376,
+              "available": 27495772160,
+              "swap_total": 8589930496,
+              "swap_free": 7881322496,
+              "swap_used": 708608000,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47090,
+              "pswpout": 163154
+            },
+            "load_average": [
+              3.0029296875,
+              2.80712890625,
+              2.32763671875
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:33:24.299557+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8293236736,
+              "available": 27504291840,
+              "swap_total": 8589930496,
+              "swap_free": 7881322496,
+              "swap_used": 708608000,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47090,
+              "pswpout": 163154
+            },
+            "load_average": [
+              3.0029296875,
+              2.80712890625,
+              2.32763671875
+            ]
+          }
+        },
+        {
+          "mode": "stream",
+          "probe": "local",
+          "launch": 2,
+          "samples": [
+            28.261569868133606,
+            28.433323817972383,
+            28.594607901359502
+          ],
+          "before": {
+            "utc": "2026-09-16T15:33:24.299831+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8293236736,
+              "available": 27504291840,
+              "swap_total": 8589930496,
+              "swap_free": 7881322496,
+              "swap_used": 708608000,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47090,
+              "pswpout": 163154
+            },
+            "load_average": [
+              3.0029296875,
+              2.80712890625,
+              2.32763671875
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:33:25.839698+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 7894196224,
+              "available": 27105284096,
+              "swap_total": 8589930496,
+              "swap_free": 7881322496,
+              "swap_used": 708608000,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47090,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.84228515625,
+              2.77685546875,
+              2.3203125
+            ]
+          }
+        },
+        {
+          "mode": "stream",
+          "probe": "prebuilt",
+          "launch": 3,
+          "samples": [
+            28.80981550845184,
+            29.493540185683678,
+            29.16508648413733
+          ],
+          "before": {
+            "utc": "2026-09-16T15:33:25.839980+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 7894196224,
+              "available": 27105284096,
+              "swap_total": 8589930496,
+              "swap_free": 7881322496,
+              "swap_used": 708608000,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47090,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.84228515625,
+              2.77685546875,
+              2.3203125
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:33:27.378892+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8180723712,
+              "available": 27391827968,
+              "swap_total": 8589930496,
+              "swap_free": 7881322496,
+              "swap_used": 708608000,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47090,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.84228515625,
+              2.77685546875,
+              2.3203125
+            ]
+          }
+        }
+      ],
+      "summary": {},
+      "passed": false,
+      "error": "bandwidth measurement invalid: swapping detected (1 pages in, 0 pages out); let memory activity settle before measuring",
+      "failed_launch": {
+        "mode": "stream",
+        "probe": "local",
+        "launch": 3,
+        "before": {
+          "utc": "2026-09-16T15:33:27.379167+00:00",
+          "memory": {
+            "total": 67337146368,
+            "free": 8180723712,
+            "available": 27391827968,
+            "swap_total": 8589930496,
+            "swap_free": 7881322496,
+            "swap_used": 708608000,
+            "edac_total": 0
+          },
+          "swap_activity": {
+            "pswpin": 47090,
+            "pswpout": 163154
+          },
+          "load_average": [
+            2.84228515625,
+            2.77685546875,
+            2.3203125
+          ]
+        },
+        "after": {
+          "utc": "2026-09-16T15:33:28.939611+00:00",
+          "memory": {
+            "total": 67337146368,
+            "free": 8325033984,
+            "available": 27536564224,
+            "swap_total": 8589930496,
+            "swap_free": 7881322496,
+            "swap_used": 708608000,
+            "edac_total": 0
+          },
+          "swap_activity": {
+            "pswpin": 47091,
+            "pswpout": 163154
+          },
+          "load_average": [
+            2.84228515625,
+            2.77685546875,
+            2.3203125
+          ]
+        }
+      },
+      "after": {
+        "utc": "2026-09-16T15:33:28.939842+00:00",
+        "memory": {
+          "total": 67337146368,
+          "free": 8325033984,
+          "available": 27536564224,
+          "swap_total": 8589930496,
+          "swap_free": 7881322496,
+          "swap_used": 708608000,
+          "edac_total": 0
+        },
+        "swap_activity": {
+          "pswpin": 47091,
+          "pswpout": 163154
+        },
+        "load_average": [
+          2.84228515625,
+          2.77685546875,
+          2.3203125
+        ]
+      }
+    },
+    "fault_injection_shim_source": "#include <errno.h>\n#include <stdlib.h>\n#include <string.h>\n#include <sys/resource.h>\n\nint getrusage(__rusage_who_t who, struct rusage *usage) {\n    static unsigned calls;\n    const char *mode = getenv(\"WIRL_FAULT_TEST\");\n    calls++;\n    memset(usage, 0, sizeof(*usage));\n    if (mode && ((strcmp(mode, \"before-error\") == 0 && calls == 1)\n                 || (strcmp(mode, \"after-error\") == 0 && calls == 2))) {\n        errno = EIO;\n        return -1;\n    }\n    if (mode && strcmp(mode, \"fault\") == 0 && calls == 2) usage->ru_majflt = 1;\n    return 0;\n}\n",
+    "fault_injection_outcomes": [
+      {
+        "mode": "stream",
+        "binary": "original",
+        "injection": "fault",
+        "returncode": 0,
+        "stdout": "stream 0 0.051462 1073741824\n",
+        "stderr": "",
+        "before_swap": {
+          "pswpin": 47168,
+          "pswpout": 163154
+        },
+        "after_swap": {
+          "pswpin": 47168,
+          "pswpout": 163154
+        }
+      },
+      {
+        "mode": "stream",
+        "binary": "fixed",
+        "injection": "fault",
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "major page faults during timed bandwidth measurement; result invalid\n",
+        "before_swap": {
+          "pswpin": 47168,
+          "pswpout": 163154
+        },
+        "after_swap": {
+          "pswpin": 47168,
+          "pswpout": 163154
+        }
+      },
+      {
+        "mode": "gather",
+        "binary": "original",
+        "injection": "fault",
+        "returncode": 0,
+        "stdout": "gather 0 0.761137 3221225472\n",
+        "stderr": "",
+        "before_swap": {
+          "pswpin": 47168,
+          "pswpout": 163154
+        },
+        "after_swap": {
+          "pswpin": 47172,
+          "pswpout": 163154
+        }
+      },
+      {
+        "mode": "gather",
+        "binary": "fixed",
+        "injection": "fault",
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "major page faults during timed bandwidth measurement; result invalid\n",
+        "before_swap": {
+          "pswpin": 47172,
+          "pswpout": 163154
+        },
+        "after_swap": {
+          "pswpin": 47172,
+          "pswpout": 163154
+        }
+      },
+      {
+        "mode": "stream",
+        "binary": "fixed",
+        "injection": "before-error",
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "getrusage before bandwidth measurement: Input/output error\n"
+      },
+      {
+        "mode": "stream",
+        "binary": "fixed",
+        "injection": "after-error",
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "getrusage after bandwidth measurement: Input/output error\n"
+      }
+    ],
+    "corrected_comparison": {
+      "host": {
+        "model": "AMD Ryzen 9 5950X 16-Core Processor",
+        "logical": 32,
+        "physical": 16,
+        "sockets": 1,
+        "numa_nodes": 1,
+        "isa": {
+          "avx2": true,
+          "fma": true,
+          "avx512f": false,
+          "avx512_bf16": false,
+          "amx_int8": false
+        },
+        "governor": "powersave"
+      },
+      "parameters": {
+        "threads": 16,
+        "cores": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "gib": 2,
+        "reps": 3
+      },
+      "source_sha256": "f3dffeed93afd2e18854cc3352a548239ec52ca6ca59786299ded5be20880c52",
+      "binary_sha256": {
+        "prebuilt": "260bbf9db2b09667fa964bf29668cc74fe1ade7fbba9a725f34a0cc62cb18f84",
+        "local": "ada3514fd6ca174a3198b1760d6836603f6f6a8881950af13d9dd7acce7e0ead"
+      },
+      "criterion": "absolute median difference <= local raw peak-to-peak spread; both raw spreads <= 10%; no new swap-outs or timed major faults",
+      "before": {
+        "utc": "2026-09-16T15:37:25.587511+00:00",
+        "memory": {
+          "total": 67337146368,
+          "free": 8600690688,
+          "available": 27916242944,
+          "swap_total": 8589930496,
+          "swap_free": 7881527296,
+          "swap_used": 708403200,
+          "edac_total": 0
+        },
+        "swap_activity": {
+          "pswpin": 47195,
+          "pswpout": 163154
+        },
+        "load_average": [
+          2.5234375,
+          2.52392578125,
+          2.298828125
+        ]
+      },
+      "runs": [
+        {
+          "mode": "stream",
+          "probe": "prebuilt",
+          "launch": 1,
+          "samples": [
+            28.510709327951993,
+            28.929351869813555,
+            29.272026062183937
+          ],
+          "before": {
+            "utc": "2026-09-16T15:37:25.587801+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8600690688,
+              "available": 27916242944,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47195,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.5234375,
+              2.52392578125,
+              2.298828125
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:37:27.136369+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8336752640,
+              "available": 27653185536,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47195,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.5234375,
+              2.52392578125,
+              2.298828125
+            ]
+          }
+        },
+        {
+          "mode": "stream",
+          "probe": "local",
+          "launch": 1,
+          "samples": [
+            28.575583132626313,
+            29.08568862161906,
+            28.95002154248507
+          ],
+          "before": {
+            "utc": "2026-09-16T15:37:27.136642+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8336752640,
+              "available": 27653185536,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47195,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.5234375,
+              2.52392578125,
+              2.298828125
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:37:28.708471+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 7886786560,
+              "available": 27204521984,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47196,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.5234375,
+              2.52392578125,
+              2.298828125
+            ]
+          }
+        },
+        {
+          "mode": "stream",
+          "probe": "prebuilt",
+          "launch": 2,
+          "samples": [
+            28.548611416872724,
+            29.058925427260796,
+            28.07718700398771
+          ],
+          "before": {
+            "utc": "2026-09-16T15:37:28.708743+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 7886786560,
+              "available": 27204521984,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47196,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.5234375,
+              2.52392578125,
+              2.298828125
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:37:30.273431+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8124882944,
+              "available": 27443802112,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47196,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.56201171875,
+              2.5322265625,
+              2.302734375
+            ]
+          }
+        },
+        {
+          "mode": "stream",
+          "probe": "local",
+          "launch": 2,
+          "samples": [
+            28.47479544399804,
+            28.622811094672585,
+            28.46649144341786
+          ],
+          "before": {
+            "utc": "2026-09-16T15:37:30.273682+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8124882944,
+              "available": 27443802112,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47196,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.56201171875,
+              2.5322265625,
+              2.302734375
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:37:31.833191+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8512643072,
+              "available": 27832561664,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47196,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.56201171875,
+              2.5322265625,
+              2.302734375
+            ]
+          }
+        },
+        {
+          "mode": "stream",
+          "probe": "prebuilt",
+          "launch": 3,
+          "samples": [
+            28.680150753903067,
+            29.382164623467602,
+            29.43290545763548
+          ],
+          "before": {
+            "utc": "2026-09-16T15:37:31.833481+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8512643072,
+              "available": 27832561664,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47196,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.56201171875,
+              2.5322265625,
+              2.302734375
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:37:33.378001+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8283856896,
+              "available": 27599888384,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47196,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.56201171875,
+              2.5322265625,
+              2.302734375
+            ]
+          }
+        },
+        {
+          "mode": "stream",
+          "probe": "local",
+          "launch": 3,
+          "samples": [
+            28.443492026490066,
+            29.03456658058759,
+            29.34161756548115
+          ],
+          "before": {
+            "utc": "2026-09-16T15:37:33.378261+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8283856896,
+              "available": 27599888384,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47196,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.56201171875,
+              2.5322265625,
+              2.302734375
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:37:34.938201+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 7752916992,
+              "available": 27069861888,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47196,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.59716796875,
+              2.5400390625,
+              2.306640625
+            ]
+          }
+        },
+        {
+          "mode": "gather",
+          "probe": "prebuilt",
+          "launch": 1,
+          "samples": [
+            21.85986150734945,
+            21.533407347986522,
+            21.36558711123787
+          ],
+          "before": {
+            "utc": "2026-09-16T15:37:34.938523+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 7752916992,
+              "available": 27069861888,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47196,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.59716796875,
+              2.5400390625,
+              2.306640625
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:37:36.718198+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 7874482176,
+              "available": 27192881152,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47196,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.59716796875,
+              2.5400390625,
+              2.306640625
+            ]
+          }
+        },
+        {
+          "mode": "gather",
+          "probe": "local",
+          "launch": 1,
+          "samples": [
+            21.867429735178913,
+            22.35285669081522,
+            21.941757070459378
+          ],
+          "before": {
+            "utc": "2026-09-16T15:37:36.718540+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 7874482176,
+              "available": 27192881152,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47196,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.59716796875,
+              2.5400390625,
+              2.306640625
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:37:38.486138+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8022441984,
+              "available": 27342127104,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47196,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.59716796875,
+              2.5400390625,
+              2.306640625
+            ]
+          }
+        },
+        {
+          "mode": "gather",
+          "probe": "prebuilt",
+          "launch": 2,
+          "samples": [
+            22.02637695905473,
+            22.00125312988778,
+            21.62070416409375
+          ],
+          "before": {
+            "utc": "2026-09-16T15:37:38.486414+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8022441984,
+              "available": 27342127104,
+              "swap_total": 8589930496,
+              "swap_free": 7881527296,
+              "swap_used": 708403200,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47196,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.59716796875,
+              2.5400390625,
+              2.306640625
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:37:40.260742+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8018944000,
+              "available": 27340386304,
+              "swap_total": 8589930496,
+              "swap_free": 7881531392,
+              "swap_used": 708399104,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47197,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.7099609375,
+              2.564453125,
+              2.31591796875
+            ]
+          }
+        },
+        {
+          "mode": "gather",
+          "probe": "local",
+          "launch": 2,
+          "samples": [
+            20.59238417674585,
+            20.718074286559595,
+            20.84018342735883
+          ],
+          "before": {
+            "utc": "2026-09-16T15:37:40.260994+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8018944000,
+              "available": 27340386304,
+              "swap_total": 8589930496,
+              "swap_free": 7881531392,
+              "swap_used": 708399104,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47197,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.7099609375,
+              2.564453125,
+              2.31591796875
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:37:42.056832+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 7879643136,
+              "available": 27202277376,
+              "swap_total": 8589930496,
+              "swap_free": 7881580544,
+              "swap_used": 708349952,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47199,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.7099609375,
+              2.564453125,
+              2.31591796875
+            ]
+          }
+        },
+        {
+          "mode": "gather",
+          "probe": "prebuilt",
+          "launch": 3,
+          "samples": [
+            21.261231969479958,
+            21.25407746209372,
+            21.615046078898455
+          ],
+          "before": {
+            "utc": "2026-09-16T15:37:42.057087+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 7879643136,
+              "available": 27202277376,
+              "swap_total": 8589930496,
+              "swap_free": 7881580544,
+              "swap_used": 708349952,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47199,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.7099609375,
+              2.564453125,
+              2.31591796875
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:37:43.839609+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8247934976,
+              "available": 27571904512,
+              "swap_total": 8589930496,
+              "swap_free": 7881580544,
+              "swap_used": 708349952,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47199,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.7099609375,
+              2.564453125,
+              2.31591796875
+            ]
+          }
+        },
+        {
+          "mode": "gather",
+          "probe": "local",
+          "launch": 3,
+          "samples": [
+            22.00425895034531,
+            21.833635896566918,
+            21.197851224006317
+          ],
+          "before": {
+            "utc": "2026-09-16T15:37:43.839912+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8247934976,
+              "available": 27571904512,
+              "swap_total": 8589930496,
+              "swap_free": 7881580544,
+              "swap_used": 708349952,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47199,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.7099609375,
+              2.564453125,
+              2.31591796875
+            ]
+          },
+          "after": {
+            "utc": "2026-09-16T15:37:45.639263+00:00",
+            "memory": {
+              "total": 67337146368,
+              "free": 8130998272,
+              "available": 27456499712,
+              "swap_total": 8589930496,
+              "swap_free": 7881580544,
+              "swap_used": 708349952,
+              "edac_total": 0
+            },
+            "swap_activity": {
+              "pswpin": 47199,
+              "pswpout": 163154
+            },
+            "load_average": [
+              2.9736328125,
+              2.62158203125,
+              2.3359375
+            ]
+          }
+        }
+      ],
+      "summary": {
+        "stream": {
+          "local_launch_medians": [
+            28.95002154248507,
+            28.47479544399804,
+            29.03456658058759
+          ],
+          "prebuilt_launch_medians": [
+            28.929351869813555,
+            28.548611416872724,
+            29.382164623467602
+          ],
+          "local_median": 28.95002154248507,
+          "prebuilt_median": 28.929351869813555,
+          "median_difference_gb_per_second": 0.020669672671516537,
+          "median_difference_pct": 0.07139777993319674,
+          "local_span_gb_per_second": 0.8981255389910849,
+          "local_spread_pct": 3.1023311594882834,
+          "prebuilt_spread_pct": 4.6863077325365206,
+          "within_local_spread": true,
+          "stable": true,
+          "passed": true
+        },
+        "gather": {
+          "local_launch_medians": [
+            21.941757070459378,
+            20.718074286559595,
+            21.833635896566918
+          ],
+          "prebuilt_launch_medians": [
+            21.533407347986522,
+            22.00125312988778,
+            21.261231969479958
+          ],
+          "local_median": 21.833635896566918,
+          "prebuilt_median": 21.533407347986522,
+          "median_difference_gb_per_second": 0.30022854858039594,
+          "median_difference_pct": 1.3750735333440425,
+          "local_span_gb_per_second": 1.7604725140693702,
+          "local_spread_pct": 8.063121151279178,
+          "prebuilt_spread_pct": 3.586517844019818,
+          "within_local_spread": true,
+          "stable": true,
+          "passed": true
+        }
+      },
+      "passed": true,
+      "after": {
+        "utc": "2026-09-16T15:37:45.639542+00:00",
+        "memory": {
+          "total": 67337146368,
+          "free": 8130998272,
+          "available": 27456499712,
+          "swap_total": 8589930496,
+          "swap_free": 7881580544,
+          "swap_used": 708349952,
+          "edac_total": 0
+        },
+        "swap_activity": {
+          "pswpin": 47199,
+          "pswpout": 163154
+        },
+        "load_average": [
+          2.9736328125,
+          2.62158203125,
+          2.3359375
+        ]
+      },
+      "swap_delta": {
+        "pswpin": 4,
+        "pswpout": 0
+      },
+      "wheel": {
+        "name": "will_it_run_local-0.1.0-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+        "sha256": "747657fa8165b83d2955d2da9b2ee2584d6793be000a73e4f397365b4ed3c381"
+      }
+    },
+    "updated_compiler_free_container": {
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "-v",
+        "/tmp/wirl-bandwidth-fix.b1eUdt/wheels:/wheels:ro",
+        "-v",
+        "/home/john/repos/will-it-run-local/tools:/checks:ro",
+        "python:3.12-slim-bookworm",
+        "sh",
+        "-eu",
+        "-c",
+        "python -m pip install --no-index --no-deps /wheels/*.whl\npython -c 'import shutil; assert not any(shutil.which(cc) for cc in (\"cc\", \"gcc\", \"clang\")); print(\"cc/gcc/clang absent\")'\npython /checks/check_installed_probe.py --measure"
+      ],
+      "image_id": "sha256:59bf1d95c965f12dfc14afaf5af778fc1dbe5b372bd5c281645fc34d4c75d4e7",
+      "before_utc": "2026-09-16T15:38:12.953829+00:00",
+      "before_swap": {
+        "pswpin": 47199,
+        "pswpout": 163154
+      },
+      "parameters": {
+        "threads": 1,
+        "gib": 1,
+        "reps": 1
+      },
+      "stdout": "Processing /wheels/will_it_run_local-0.1.0-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl\nInstalling collected packages: will-it-run-local\nSuccessfully installed will-it-run-local-0.1.0\ncc/gcc/clang absent\nprebuilt probe starts without a compiler: /usr/local/lib/python3.12/site-packages/wirl/_bin/membw\nstream: 21.18 GB/s\ngather: 4.52 GB/s\n",
+      "stderr": "WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.\n",
+      "returncode": 0,
+      "after_utc": "2026-09-16T15:38:16.484543+00:00",
+      "after_swap": {
+        "pswpin": 47199,
+        "pswpout": 163154
+      },
+      "swap_delta": {
+        "pswpin": 0,
+        "pswpout": 0
+      }
+    },
+    "busy_lock_integration": {
+      "returncode": 1,
+      "stdout": "{}\n",
+      "stderr": "another benchmark holds /tmp/wirl-bandwidth-fix.b1eUdt/held.lock (owner: acceptance lock integration check). Concurrent benchmarks produce invalid numbers; wait for it to finish or pass --wait.\n",
+      "json": {
+        "passed": false,
+        "error": "another benchmark holds /tmp/wirl-bandwidth-fix.b1eUdt/held.lock (owner: acceptance lock integration check). Concurrent benchmarks produce invalid numbers; wait for it to finish or pass --wait."
+      }
+    }
+  }
 }

@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <time.h>
 
 static size_t NBYTES;
@@ -109,11 +110,27 @@ int main(int argc, char **argv) {
     arg_t args[512];
     for (int rep = 0; rep < reps; rep++) {
         for (long i = 0; i < NTHREADS; i++) { args[i].id = i; args[i].core = cores[i]; }
+        /* One unrelated system-wide page-in aborted an otherwise quiet run.
+         * Check disk faults in our timed workload; keep diagnostics outside
+         * the clock interval so the measured kernels stay the same. */
+        struct rusage before, after;
+        if (getrusage(RUSAGE_SELF, &before) != 0) {
+            perror("getrusage before bandwidth measurement");
+            return 1;
+        }
         double t0 = now();
         for (long i = 0; i < NTHREADS; i++)
             pthread_create(&th[i], NULL, is_stream ? stream_worker : gather_worker, &args[i]);
         for (long i = 0; i < NTHREADS; i++) pthread_join(th[i], NULL);
         double el = now() - t0;
+        if (getrusage(RUSAGE_SELF, &after) != 0) {
+            perror("getrusage after bandwidth measurement");
+            return 1;
+        }
+        if (after.ru_majflt > before.ru_majflt) {
+            fprintf(stderr, "major page faults during timed bandwidth measurement; result invalid\n");
+            return 1;
+        }
         double bytes = is_stream ? (double)NBYTES
                                  : (double)NTHREADS * GATHER_ITERS * 64.0;
         printf("%s %d %.6f %.0f\n", mode, rep, el, bytes);

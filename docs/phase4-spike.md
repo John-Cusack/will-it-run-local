@@ -68,3 +68,10 @@ including a compiler-free container, to exercise both kernels. The authorised
 local follow-up now passes the actual compiler-free container measurements and
 records alternating host comparisons. The idle EPYC reference comparison,
 native ARM execution and remote CI runs remain pending.
+
+The subsequent investigation fixes unused-RAM budgeting and fault attribution,
+and automates the comparison using median differences versus measured spread.
+The rebuilt wheel passes both host modes and the compiler-free container with
+the new timed-fault diagnostics. Those diagnostics sit outside the C clock
+interval and leave both measured worker kernels unchanged. The full
+investigation and retained failures are linked in the acceptance report above.

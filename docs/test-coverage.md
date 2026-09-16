@@ -1,19 +1,23 @@
 # Test coverage
 
 **Current status: 100% Python line and branch coverage.** On 2026-09-16 the
-completed coverage and bandwidth follow-ups pass 369 tests and cover all 2381 statements
-and 734 branch outcomes across every module in `wirl`. No source files,
+completed coverage and bandwidth follow-ups pass 402 tests and cover all 2386 statements
+and 736 branch outcomes across every module in `wirl`. No source files,
 statements or error paths are excluded. The bandwidth allocation/swap guards
-add 27 statements and eight branch outcomes to the earlier 353-test totals.
+and timed-fault checks add 32 statements and ten branch outcomes to the earlier
+353-test totals.
 Fresh editable-install venvs on Python 3.9.25 and 3.14.2 reproduce these exact
 totals and pass plain `pytest -q`. The extracted CI test/JSON gate also passes
 locally on 3.14.2. Python 3.12.3 passes the same suite and coverage totals.
 
-The follow-ups add 182 tests/cases covering the gaps below and allocation/swap
-safety. The tests exposed
+The follow-ups add 215 tests/cases covering the gaps below, allocation/fault
+safety and the acceptance comparison. The tests exposed
 and fixed an extra blank first line when wrapping a long word. Two redundant
-empty-list guards after head-count normalisation were also simplified. Existing
-tests and the published measurements in `tests/test_predict.py` are unchanged.
+empty-list guards after head-count normalisation were also simplified.
+Published measurements in `tests/test_predict.py` are unchanged. Inventory and
+measurement fixtures add fake free RAM/swap counters while retaining prior
+assertions. A page-in-only rejection case was replaced with process-scoped
+fault checks after it falsely attributed a global event to the probe.
 
 ## Historical measurements
 
@@ -79,12 +83,13 @@ mocked, including in negative controls.
 
 The user authorised the real Phase 4 bandwidth checks. The installed wheel
 successfully measures stream and gather in a network-disabled container with
-no compiler. Three alternating launches per probe per mode were also recorded
-on the available Ryzen 5950X host. The 8 GiB attempt detected swapping and
-failed gather's median comparison; the 2 GiB repeat passes both median range
-checks with no new swap-outs, but concurrent page-ins and the differing host
-leave idle reference-machine acceptance pending. Every-sample containment
-fails and is recorded separately. All samples and the method are retained in
+no compiler. Investigation fixes the unsafe buffer budget and false-positive
+comparison/fault attribution. The updated wheel passes three alternating
+launches per probe per mode on the available Ryzen 5950X host, using three
+repetitions, the automatic 2 GiB buffer, measured-noise checks, zero new
+swap-outs and no timed major faults. The earlier swapping/failed comparison
+and page-in abort are retained alongside the passing results. All samples,
+criteria changes, scoped-fault injection and the method are retained in
 [`phase4-bandwidth-acceptance.md`](phase4-bandwidth-acceptance.md).
 
 Native ARM execution and remote CI also remain pending. The workflow implements

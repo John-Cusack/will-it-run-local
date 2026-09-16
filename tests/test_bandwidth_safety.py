@@ -1,5 +1,7 @@
 """Reject memory pressure without allocating buffers or starting a probe."""
 import subprocess
+from types import SimpleNamespace
+import sys
 
 import pytest
 
@@ -40,7 +42,7 @@ def test_invalid_buffer_size_is_rejected(gib):
         membw.measure(threads=1, gib=gib)
 
 
-@pytest.mark.parametrize("page_in,page_out", [(1, 0), (0, 1), (7, 9)])
+@pytest.mark.parametrize("page_in,page_out", [(0, 1), (7, 9)])
 def test_concurrent_swapping_invalidates_c_results(monkeypatch, page_in, page_out):
     values = iter([{"pswpin": 10, "pswpout": 20},
                    {"pswpin": 10 + page_in, "pswpout": 20 + page_out}])
@@ -60,10 +62,26 @@ def test_historical_swap_use_does_not_invalidate_idle_measurement(monkeypatch):
     assert result.samples == [2] and result.method == "c-probe"
 
 
+def test_unrelated_page_in_is_not_attributed_to_probe(monkeypatch):
+    values = iter([{"pswpin": 10, "pswpout": 20}, {"pswpin": 11, "pswpout": 20}])
+    monkeypatch.setattr(probe, "swap_activity", lambda: next(values))
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **kw:
+                        subprocess.CompletedProcess(cmd, 0, "stream 0 1 2000000000\n", ""))
+    assert membw.measure(threads=1, gib=1).samples == [2]
+
+
+def test_timed_probe_fault_diagnostic_is_preserved(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **kw:
+                        subprocess.CompletedProcess(cmd, 1, "",
+                                                    "major page faults during timed bandwidth measurement; result invalid\n"))
+    with pytest.raises(RuntimeError, match="major page faults.*invalid"):
+        membw.measure(threads=1, gib=1)
+
+
 @pytest.mark.parametrize("swapping", [False, True])
 def test_numpy_fallback_checks_swap_activity(monkeypatch, swapping):
     values = iter([{"pswpin": 10, "pswpout": 20},
-                   {"pswpin": 11 if swapping else 10, "pswpout": 20}])
+                   {"pswpin": 10, "pswpout": 21 if swapping else 20}])
     monkeypatch.setattr(probe, "swap_activity", lambda: next(values))
     monkeypatch.setattr(membw, "_build_probe", lambda: (None, "no compiler"))
     fallback = membw.BwResult("stream", 1, 1, [2], "fake numpy")
@@ -73,3 +91,20 @@ def test_numpy_fallback_checks_swap_activity(monkeypatch, swapping):
             membw.measure(threads=1, gib=1)
     else:
         assert membw.measure(threads=1, gib=1) is fallback
+
+
+@pytest.mark.parametrize("faults", [0, 1])
+def test_numpy_timed_faults_use_process_counters(monkeypatch, faults):
+    fake = SimpleNamespace(uint64="uint64", ones=lambda *args, **kw: SimpleNamespace(sum=lambda: 12))
+    monkeypatch.setitem(sys.modules, "numpy", fake)
+    ticks = iter([0, 1])
+    monkeypatch.setattr("time.monotonic", lambda: next(ticks))
+    usages = iter([SimpleNamespace(ru_majflt=0), SimpleNamespace(ru_majflt=faults)])
+    monkeypatch.setattr("resource.getrusage", lambda who: next(usages))
+    if faults:
+        with pytest.raises(RuntimeError, match="major page faults.*invalid"):
+            membw._numpy_stream(1, 1)
+    else:
+        result = membw._numpy_stream(1, 1)
+        monkeypatch.setitem(sys.modules, "numpy", None)
+        assert result.samples == pytest.approx([1.073741824])
