@@ -1,22 +1,28 @@
 [build-system]
-requires = ["setuptools>=68"]
+# 77 is the first release that understands SPDX `license` and `license-files`.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "will-it-run-local"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Predict and tune local LLM inference from measured hardware limits, not nameplate specs."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "John Cusack" }]
 keywords = ["llama.cpp", "gguf", "llm", "inference", "benchmark", "moe"]
 classifiers = [
+  "Development Status :: 3 - Alpha",
   "Environment :: Console",
+  "Environment :: GPU :: NVIDIA CUDA",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: System :: Benchmark",
 ]
 # No runtime dependencies on purpose: this tool runs on machines that are
 # already short on memory, and it should never be the reason an environment
@@ -33,11 +39,15 @@ wirl = "wirl.cli:main"
 Homepage = "https://github.com/John-Cusack/will-it-run-local"
 Issues = "https://github.com/John-Cusack/will-it-run-local/issues"
 
-[tool.setuptools]
-packages = ["wirl"]
+[tool.setuptools.dynamic]
+version = { attr = "wirl.__version__" }
 
+[tool.setuptools.packages.find]
+include = ["wirl", "wirl.*"]
+
+# The bandwidth probe ships as source and is compiled on first use.
 [tool.setuptools.package-data]
-wirl = ["csrc/*.c"]
+"wirl.csrc" = ["*.c"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

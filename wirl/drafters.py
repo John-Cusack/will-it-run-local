@@ -31,7 +31,7 @@ import re
 import urllib.parse
 import urllib.request
 
-from . import compat
+from . import USER_AGENT, compat
 
 HF_SEARCH = "https://huggingface.co/api/models"
 
@@ -42,7 +42,7 @@ DRAFT_MAX_B = 4.0
 
 
 def _get(url, timeout=30):
-    req = urllib.request.Request(url, headers={"User-Agent": "will-it-run-local/0.1"})
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.load(r)
 

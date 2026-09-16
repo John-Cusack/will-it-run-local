@@ -1,5 +1,7 @@
 # will-it-run-local
 
+[![tests](https://github.com/John-Cusack/will-it-run-local/actions/workflows/ci.yml/badge.svg)](https://github.com/John-Cusack/will-it-run-local/actions/workflows/ci.yml)
+
 **You have a CPU and one consumer GPU. The model you want needs ten times your
 VRAM, and you are not spending five figures on an RTX 6000 Pro to run it.**
 
@@ -527,7 +529,6 @@ itself:
   recommended file and measuring it.
 - **Single GPU only.** With several present it uses index 0 unless told
   otherwise; multi-GPU splits are not modelled at all.
-- **CI is configured but has not yet run** on GitHub, only locally.
 - **The VRAM edge is found by whether the server starts, which is not the same
   as whether it fits.** llama.cpp allocates the KV cache lazily, so a context
   size can load happily and then run out of VRAM once a conversation actually
@@ -544,7 +545,7 @@ itself:
 
 ## A worked example
 
-[`examples/`](examples/) holds the actual running configuration from the
+[`examples/`](https://github.com/John-Cusack/will-it-run-local/tree/main/examples) holds the actual running configuration from the
 reference machine — the launcher, the systemd unit, and the probe scripts —
 annotated with the measurement behind every flag, so the reasoning survives
 being read six months later.
@@ -576,7 +577,7 @@ every run rather than cached. That CPU is being replaced.
 
 ```bash
 pip install -e '.[dev]'
-pytest                    # 92 tests, no model files or GPU required
+pytest                    # no model files or GPU required
 ```
 
 Tests use synthetic GGUFs built in-process and mock every server launch. The regression tests in

@@ -1,0 +1,3 @@
+# setuptools only picks up tests/test*.py on its own. Without conftest.py the
+# suite cannot run from an sdist, which is how distro packagers test.
+recursive-include tests *.py

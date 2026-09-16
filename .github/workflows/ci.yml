@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 jobs:
   test:
@@ -11,9 +12,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.9 is the floor declared in pyproject.toml; 3.13 catches anything
+        # 3.9 is the floor declared in pyproject.toml; 3.14 catches anything
         # that relies on removed behaviour.
-        python-version: ["3.9", "3.11", "3.13"]
+        python-version: ["3.9", "3.11", "3.14"]
     steps:
       - uses: actions/checkout@v4
 
@@ -47,3 +48,35 @@ jobs:
           for c in auto probe inspect plan recommend doctor check-draft find-draft bandwidth tune; do
             python -m wirl "$c" --help > /dev/null || exit 1
           done
+
+  package:
+    # The job above tests the checkout. This tests what pip actually installs:
+    # the wheel must carry the probe's C source, and the sdist must carry
+    # everything needed to run the suite.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Build
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          twine check --strict dist/*
+
+      - name: Tests from the sdist, against the installed wheel
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install dist/*.whl pytest
+          mkdir "$RUNNER_TEMP/sdist"
+          tar xzf dist/*.tar.gz -C "$RUNNER_TEMP/sdist" --strip-components=1
+          # Run from outside the source tree so `wirl` can only resolve to
+          # the installed wheel.
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/venv/bin/python" -c "import wirl, sys; assert 'site-packages' in wirl.__file__, wirl.__file__"
+          "$RUNNER_TEMP/venv/bin/pytest" -q -p no:cacheprovider sdist/tests
+          "$RUNNER_TEMP/venv/bin/python" -c "from wirl.membw import build_probe; assert build_probe(force=True)"
+          "$RUNNER_TEMP/venv/bin/wirl" --version

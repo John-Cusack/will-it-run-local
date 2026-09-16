@@ -18,6 +18,7 @@ import struct
 import urllib.request
 from dataclasses import dataclass, field
 
+from . import USER_AGENT
 from .ggml_types import tensor_nbytes, type_name
 
 GGUF_MAGIC = b"GGUF"
@@ -49,7 +50,7 @@ class _Reader:
         req = urllib.request.Request(
             self.url,
             headers={"Range": f"bytes={start}-{start + length - 1}",
-                     "User-Agent": "will-it-run-local/0.1"},
+                     "User-Agent": USER_AGENT},
         )
         with urllib.request.urlopen(req, timeout=60) as r:
             return r.read()

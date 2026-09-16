@@ -17,6 +17,8 @@ from __future__ import annotations
 import json
 import urllib.request
 
+from . import USER_AGENT
+
 HF_API = "https://huggingface.co/api/models"
 
 
@@ -27,7 +29,7 @@ def resolve_url(repo: str, filename: str) -> str:
 def list_gguf(repo: str) -> list:
     """GGUF files in a HuggingFace repo with their sizes."""
     req = urllib.request.Request(f"{HF_API}/{repo}/tree/main?recursive=1",
-                                 headers={"User-Agent": "will-it-run-local/0.1"})
+                                 headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=60) as r:
         tree = json.load(r)
     out = []

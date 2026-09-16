@@ -65,9 +65,8 @@ def test_kv_cache_quantisation_shrinks_it(moe_model):
     assert q8 < f16
 
 
-def test_dense_model_reads_everything(tmp_path):
+def test_dense_model_reads_everything(tmp_path, build_gguf):
     """With no experts, bytes/token is essentially the whole model."""
-    from tests.conftest import build_gguf
     kv = {"general.architecture": (8, "dense"),
           "dense.block_count": (4, 1),
           "dense.embedding_length": (4, 8)}
@@ -78,9 +77,8 @@ def test_dense_model_reads_everything(tmp_path):
     assert mc.bytes_per_token == mc.total_bytes
 
 
-def test_dense_offload_moves_whole_layers(tmp_path):
+def test_dense_offload_moves_whole_layers(tmp_path, build_gguf):
     """For a dense model the knob is --n-gpu-layers, and it moves everything."""
-    from tests.conftest import build_gguf
     kv = {"general.architecture": (8, "dense"), "dense.block_count": (4, 4),
           "dense.embedding_length": (4, 8)}
     t = [(f"blk.{i}.attn_q.weight", (8, 8), 0) for i in range(4)]
@@ -97,8 +95,7 @@ def test_dense_offload_moves_whole_layers(tmp_path):
         assert sum(mc.split_dense(n)) == mc.bytes_per_token
 
 
-def test_dense_vram_grows_with_offloaded_layers(tmp_path):
-    from tests.conftest import build_gguf
+def test_dense_vram_grows_with_offloaded_layers(tmp_path, build_gguf):
     kv = {"general.architecture": (8, "dense"), "dense.block_count": (4, 4),
           "dense.embedding_length": (4, 8)}
     t = [(f"blk.{i}.attn_q.weight", (8, 8), 0) for i in range(4)]
@@ -110,7 +107,7 @@ def test_dense_vram_grows_with_offloaded_layers(tmp_path):
     assert mc.kv_fraction_on_gpu(2) == 0.5
 
 
-def test_per_layer_kv_compression_is_honoured(tmp_path):
+def test_per_layer_kv_compression_is_honoured(tmp_path, build_gguf):
     """Some architectures keep only a fraction of tokens in most layers.
 
     DeepSeek-V4-Flash publishes attention.compress_ratios; on the reference
@@ -118,7 +115,6 @@ def test_per_layer_kv_compression_is_honoured(tmp_path):
     cache is ~19% of the naive figure. Ignoring it over-estimates KV by 5x and
     makes a context that is nearly free look unaffordable.
     """
-    from tests.conftest import build_gguf
     base = {"general.architecture": (8, "cmp"), "cmp.block_count": (4, 4),
             "cmp.embedding_length": (4, 8),
             "cmp.attention.head_count": (4, 2),
@@ -137,8 +133,7 @@ def test_per_layer_kv_compression_is_honoured(tmp_path):
     assert small == pytest.approx(full / 4, rel=0.01)
 
 
-def test_compress_ratio_zero_means_uncompressed(tmp_path):
-    from tests.conftest import build_gguf
+def test_compress_ratio_zero_means_uncompressed(tmp_path, build_gguf):
     base = {"general.architecture": (8, "cmp"), "cmp.block_count": (4, 2),
             "cmp.embedding_length": (4, 8),
             "cmp.attention.head_count": (4, 2),

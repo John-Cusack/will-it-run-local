@@ -22,7 +22,7 @@ def _value(vtype, v):
     raise ValueError(vtype)
 
 
-def build_gguf(path, kv, tensors):
+def write_gguf(path, kv, tensors):
     """kv: {key: (type, value)}; tensors: [(name, dims, type_id)]."""
     out = bytearray(b"GGUF")
     out += struct.pack("<I", 3)
@@ -47,6 +47,17 @@ def build_gguf(path, kv, tensors):
         off += 32
     path.write_bytes(bytes(out))
     return str(path)
+
+
+@pytest.fixture
+def build_gguf():
+    """The GGUF writer, as a fixture.
+
+    Tests must not `from tests.conftest import ...`: that only resolves when
+    the working directory happens to be on sys.path, and any other installed
+    package named `tests` shadows it.
+    """
+    return write_gguf
 
 
 @pytest.fixture
@@ -81,4 +92,4 @@ def moe_model(tmp_path):
                     (f"blk.{li}.ffn_up_shexp.weight", (4, 4), 0)]
     tensors.append(("token_embd.weight", (4, 3), 0))
     tensors.append(("output.weight", (4, 3), 0))
-    return build_gguf(tmp_path / "toymoe.gguf", kv, tensors)
+    return write_gguf(tmp_path / "toymoe.gguf", kv, tensors)

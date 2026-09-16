@@ -23,12 +23,11 @@ def test_rejects_non_gguf(tmp_path):
         gguf.read(str(p))
 
 
-def test_vocab_signature_is_content_based(tmp_path, moe_model):
+def test_vocab_signature_is_content_based(tmp_path, moe_model, build_gguf):
     """Two models with the same token count but different tokens must differ.
 
     Comparing n_vocab alone would call these compatible and produce garbage.
     """
-    from tests.conftest import build_gguf
     g1 = gguf.read(moe_model)
     kv = {
         "general.architecture": (8, "toymoe"),
