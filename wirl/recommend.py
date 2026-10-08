@@ -138,6 +138,31 @@ def evaluate(cand: Candidate, bw_cpu, bw_gpu, vram_budget, ram_available, ctx,
         cand.note = "larger than VRAM + RAM combined"
         return cand
 
+    # CPU-only: there is no GPU split to fit, so price the whole model from
+    # system RAM. tps is a real (derated) CPU figure, never 0.0.
+    if vram_budget <= 0:
+        if not predict.cpu_only_pricable(mc):
+            cand.note = "too small to price meaningfully"
+            cand.fits_at_all = False
+            return cand
+        cand.knob = "--n-cpu-moe" if mc.is_moe else "--n-gpu-layers"
+        cand.knob_value = mc.n_layer if mc.is_moe else 0
+        cand.tps = predict.cpu_only_tps(mc, bw_cpu)
+        cand.vram = 0
+        cand.cpu_share = 1.0
+        # Nothing is read from a GPU, so there is no uncalibrated GPU term
+        # to mark down: the 0.70 derate is itself measured.
+        cand.confidence = "calibrated"
+        cand.ram_needed = mc.total_bytes
+        cand.fits_vram = False
+        if cand.ram_needed > ram_available:
+            cand.note = "would swap: not enough system RAM"
+            cand.fits_at_all = False
+        elif cand.tps <= 0:
+            cand.note = "no usable memory-bandwidth figure"
+            cand.fits_at_all = False
+        return cand
+
     if mc.is_moe:
         best, _ = predict.best_fit(mc, g, bw_cpu, bw_gpu, vram_budget, ctx,
                                    headroom=headroom)
@@ -147,7 +172,10 @@ def evaluate(cand: Candidate, bw_cpu, bw_gpu, vram_budget, ram_available, ctx,
                                          headroom=min(headroom, 1.0e9))
         cand.knob = "--n-gpu-layers"
     if best is None:
+        # Nothing fits at this context length: mark it unusable so the table
+        # prints `--` with the reason, never a 0.0 tok/s "measurement".
         cand.note = "does not fit at this context length"
+        cand.fits_at_all = False
         return cand
 
     cand.knob_value = best.n_cpu_moe

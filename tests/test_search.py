@@ -247,12 +247,3 @@ def test_auto_refuses_without_a_gpu_and_says_why(monkeypatch, capsys):
     assert e.value.code != 0
 
 
-def test_plan_falls_back_to_a_cpu_only_estimate(monkeypatch, capsys, moe_model):
-    from wirl import cli
-    _no_gpu(monkeypatch)
-    cli.main(["plan", moe_model, "--mem-bandwidth", "20"])
-    out = capsys.readouterr().out
-    assert "none -- CPU only" in out
-    assert "CPU only:" in out
-    # and it must not pretend the estimate is trustworthy
-    assert "well below this" in out

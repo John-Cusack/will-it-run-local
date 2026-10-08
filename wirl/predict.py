@@ -133,6 +133,18 @@ def best_fit(mc, g, bw_cpu, bw_gpu, vram_budget, ctx, headroom=3.0e9,
     return max(ok, key=lambda p: p.tps), pts
 
 
+# Below this many weight bytes read per token, fixed per-token overhead
+# (kernel launches, attention scaffolding) dominates the bandwidth term and
+# the roofline stops meaning anything. No real LLM reads this little per
+# token; synthetic toys do.
+CPU_ONLY_MIN_BYTES_PER_TOKEN = 1_000_000
+
+
+def cpu_only_pricable(mc) -> bool:
+    """Whether a CPU-only roofline figure would be meaningful at all."""
+    return mc.bytes_per_token >= CPU_ONLY_MIN_BYTES_PER_TOKEN
+
+
 # Running with no GPU at all (-ngl 0) lands well below the pure-bandwidth
 # roofline: with nothing offloaded, router and attention work is no longer
 # overlapped with expert reads and stops being free. Measured 2.21 tok/s against
