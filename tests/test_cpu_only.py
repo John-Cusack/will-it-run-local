@@ -195,13 +195,15 @@ def test_tune_cpu_only_reports_the_null_result(monkeypatch, capsys, tmp_path):
     _no_gpu(monkeypatch)
     monkeypatch.setattr(cli, "find_server", lambda explicit=None: "/bin/true")
     path = _bigmoe_model(tmp_path)
-    counts = _cpu_sweep(monkeypatch, [10.0, 10.05, 9.98, 10.02])
+    counts = _cpu_sweep(monkeypatch, [10.0, 10.05, 9.98])
     assert cli.main(["tune", path, "--mem-bandwidth", "20"]) == 0
     out = capsys.readouterr().out
     assert "CPU-only" in out
     assert "Null result" in out
     assert "this GPU" not in out
-    assert len(counts) >= 3
+    # The point count follows this box's core count (2 on small CI VMs,
+    # 3 on a 16-core workstation); the sweep must run either way.
+    assert len(counts) >= 2
 
 
 def test_tune_cpu_only_measures_when_too_small_to_price(monkeypatch, capsys,
