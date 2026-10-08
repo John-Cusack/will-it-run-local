@@ -182,12 +182,21 @@ def cmd_plan(args):
         print("  GPU              none -- CPU only")
 
     if not gpu:
+        if not predict.cpu_only_pricable(mc):
+            head("Prediction")
+            print("  CPU only: too small to price -- no meaningful figure")
+            para("This model reads so little per token that fixed per-token "
+                 "overhead dominates the bandwidth term; any tok/s number "
+                 "would be fiction. That usually means a synthetic toy, not "
+                 "a real quant -- plan the downloaded file to get an estimate.")
+            return
         tps = predict.cpu_only_tps(mc, bw_cpu)
         head("Prediction")
         print(f"  CPU only: ~{tps:.1f} tok/s ceiling")
-        para("Real throughput will be well below this; on the reference machine "
-             "a CPU-only run reached about half its roofline because router and "
-             "attention overhead stop being hidden once nothing is on a GPU.")
+        para("Real throughput will be below this; on the reference machine "
+             "a CPU-only run reached about 70% of its roofline (derate 0.70) "
+             "because router and attention overhead stop being hidden once "
+             "nothing is on a GPU.")
         return
 
     # A dense model has no routed experts, so --n-cpu-moe does nothing at all.
@@ -271,7 +280,12 @@ def cmd_auto(args):
     if gpu:
         print(f"  {gpu['name']}, {gib(gpu['vram_total']):.1f} GiB VRAM")
     else:
-        sys.exit("error: no GPU detected; `wirl auto` tunes a CPU+GPU split.")
+        sys.exit("error: no GPU detected; `wirl auto` tunes a CPU+GPU split, "
+                 "so there is nothing for it to split on this machine. "
+                 "CPU-only is supported: run `wirl plan <model>` for a "
+                 "CPU-only tok/s estimate, `wirl tune <model>` for a measured "
+                 "thread-count sweep, and see the README Scope section for "
+                 "what CPU-only covers.")
     bw_cpu, bw_desc = _bandwidth(args)
 
     # ---- 2. pre-flight ---------------------------------------------------
@@ -533,9 +547,9 @@ def cmd_recommend(args):
     head("What you can run")
     print(f"  {'quant':<12} {'size':>9}  {'tok/s':>7}  {'where':<22} config")
     for cnd in ready:
-        if not cnd.fits_at_all:
+        if not cnd.fits_at_all or cnd.tps <= 0:
             print(f"  {cnd.name:<12} {gb(cnd.size):8.1f} GB  {'--':>7}  "
-                  + c(cnd.note, report.RED))
+                  + c(cnd.note or "no usable speed figure", report.RED))
             continue
         where = ("all on GPU" if cnd.fits_vram
                  else f"{gib(cnd.ram_needed):.1f} GiB in RAM")
@@ -710,6 +724,102 @@ def cmd_check_draft(args):
     return 0 if r["compatible"] else 1
 
 
+def _print_measured_results(results):
+    head("Results")
+    print(tune.summarise(results))
+    rep = tune.repeatability(results)
+    if rep:
+        print()
+        print(rep)
+    unstable = tune.flag_unstable(results)
+    if unstable:
+        print()
+        print(c("  " + unstable[0], report.YEL))
+        for line in unstable[1:]:
+            print(f"  {line}")
+
+
+def _tune_cpu_only(args, mc, g, dg, binary, bw_cpu):
+    """Measured thread-count sweep for a GPU-less box.
+
+    Thread count is the only knob left without a GPU, and on a
+    bandwidth-bound model it is usually a null result. That null result is
+    the deliverable: it confirms decode is memory-bound and there is nothing
+    left to tune on the CPU side.
+    """
+    physical = probe.cpu_info()["physical"]
+    counts = sorted({max(1, physical // 4), max(1, physical // 2), physical}
+                    | ({args.threads} if args.threads else set()))
+    base = RunConfig(model=g.path, ctx=args.ctx, threads=None,
+                     n_gpu_layers=0,
+                     n_cpu_moe=(mc.n_layer if mc.is_moe else None),
+                     draft_model=dg.path if dg else None,
+                     draft_ngl=0,
+                     draft_n_max=args.draft_n_max, port=args.port)
+    head("Measured sweep: --threads (CPU-only)")
+    if predict.cpu_only_pricable(mc):
+        est = predict.cpu_only_tps(mc, bw_cpu)
+        para(f"CPU-only roofline predicts ~{est:.1f} tok/s for this model. "
+             f"Thread count is the only knob left; sweeping {counts} with "
+             f"{args.reps} repetitions each to confirm. A flat result is the "
+             "expected finding -- it confirms decode is memory-bound.")
+    else:
+        para("This model is too small to price, so there is no prediction to "
+             f"check; sweeping thread counts {counts} with {args.reps} "
+             "repetitions each by measurement instead.")
+    print()
+    try:
+        with benchmark_lock(wait=args.wait):
+            results = tune.sweep_threads(base, binary, counts, reps=args.reps,
+                                         n_tokens=args.tokens,
+                                         log_dir=args.log_dir)
+    except BenchmarkBusy as e:
+        sys.exit(f"error: {e}")
+
+    _print_measured_results(results)
+    ok = [r for r in results if r.ok and r.samples]
+    if not ok:
+        sys.exit("no configuration completed successfully.")
+    win = max(ok, key=lambda r: r.mean)
+    head("Winner")
+    print(f"  {win.config.label()}  ->  {win.mean:.2f} tok/s")
+    print()
+    means = [r.mean for r in ok]
+    spread = (max(means) - min(means)) / win.mean * 100 if win.mean else 0.0
+    if spread < 8.0:
+        para(f"Null result, and that is the deliverable: threads {counts[0]}-"
+             f"{counts[-1]} agree within {spread:.1f}%. Decode is bound by "
+             "RAM bandwidth, not thread count -- run with the default and "
+             "stop tuning the CPU side.")
+    else:
+        para(f"Thread count matters here: {win.config.label()} wins by "
+             f"{spread:.1f}% across the sweep. Keep the winner.")
+    print()
+
+    if args.emit:
+        cfg = copy.copy(win.config)
+        cfg.host = args.emit_host
+        cfg.port = args.emit_port
+        notes = (f"Chosen by measurement (CPU-only thread sweep): "
+                 f"{win.mean:.2f} tok/s over {args.reps} runs "
+                 f"(spread {win.spread_pct:.1f}%).\n"
+                 f"Thread counts {counts} agree within {spread:.1f}%.")
+        script = emit.launch_script(cfg, binary,
+                                    physical_cores=physical,
+                                    extra_comment=notes)
+        p = emit.write(args.emit, script, 0o755)
+        print(f"  wrote launch script: {p}")
+        unit = emit.systemd_unit(os.path.abspath(p),
+                                 f"llama.cpp - {os.path.basename(g.path)}",
+                                 notes)
+        up = emit.write(args.emit + ".service", unit)
+        print(f"  wrote systemd unit:  {up}")
+        para(f"Install with: cp {up} ~/.config/systemd/user/ && "
+             "systemctl --user daemon-reload && systemctl --user enable --now "
+             + os.path.basename(up), indent="  ")
+    return 0
+
+
 def cmd_tune(args):
     binary = find_server(args.llama_server)
     if not binary:
@@ -729,9 +839,12 @@ def cmd_tune(args):
              "VRAM fitting will be wrong. Stop them, or pass --force if you "
              "genuinely want a contended number.")
         return 1
-
     gpu, budget, bw_gpu = _gpu_choice(args)
     bw_cpu, _ = _bandwidth(args)
+    if gpu is None:
+        # No GPU to split across: sweep the one knob left (thread count).
+        # A flat result is the expected deliverable, not a failure.
+        return _tune_cpu_only(args, mc, g, dg, binary, bw_cpu)
     best, _ = predict.best_fit(mc, g, bw_cpu, bw_gpu, budget, args.ctx,
                                headroom=args.headroom * 1e9,
                                draft_mc=dmc, draft_g=dg)
@@ -772,18 +885,7 @@ def cmd_tune(args):
     except BenchmarkBusy as e:
         sys.exit(f"error: {e}")
 
-    head("Results")
-    print(tune.summarise(results))
-    rep = tune.repeatability(results)
-    if rep:
-        print()
-        print(rep)
-    unstable = tune.flag_unstable(results)
-    if unstable:
-        print()
-        print(c("  " + unstable[0], report.YEL))
-        for line in unstable[1:]:
-            print(f"  {line}")
+    _print_measured_results(results)
 
     ok = [r for r in results if r.ok and r.samples]
     if not ok:
