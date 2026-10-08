@@ -47,8 +47,9 @@ def _gpu_choice(args):
 def _load(path, label="model"):
     try:
         g = gguf.read(path)
-    except FileNotFoundError as e:
-        sys.exit(f"error: {e}")
+    except FileNotFoundError:
+        sys.exit(f"error reading {label} '{path}': no such file -- "
+                 "`wirl recommend <hf-repo>` tells you which file to download")
     except ValueError as e:
         sys.exit(f"error reading {label}: {e}")
     return g, model.build(g)
@@ -1000,7 +1001,14 @@ def build_parser():
 
 
 def main(argv=None):
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.cmd == "check-draft":
+        if bool(args.draft) == bool(args.repo):
+            parser.error("need exactly one of --draft PATH (a local file) "
+                         "or --repo REPO [--file FILE] (a HuggingFace repo)")
+        if args.file and not args.repo:
+            parser.error("--file needs --repo (a HuggingFace repo id)")
     try:
         return args.func(args) or 0
     except KeyboardInterrupt:
