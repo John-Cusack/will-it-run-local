@@ -41,3 +41,7 @@ wirl = ["csrc/*.c"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# test_model/test_gguf import `tests.conftest` as a top-level package;
+# bare `pytest` (as CI runs it) does not put the repo root on sys.path,
+# unlike `python -m pytest`. This keeps both invocations working.
+pythonpath = ["."]
